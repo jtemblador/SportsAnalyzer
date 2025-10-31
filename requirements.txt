@@ -1,0 +1,6 @@
+nfl_data_py==0.3.3
+pandas==1.5.3
+duckdb==1.4.1
+pyarrow==21.0.0
+numpy==1.24.4
+fastparquet==2024.11.0

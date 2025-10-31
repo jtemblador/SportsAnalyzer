@@ -1,0 +1,151 @@
+# Project Context Summary for AI Assistant
+
+## **Project Overview**
+Building a **multi-sport analytics platform** (currently focused on NFL) that predicts player performance using machine learning. This is a senior design project with a focus on local-first architecture, transparent predictions, and explainable AI.
+
+---
+
+## **Current Project Status**
+
+### **✅ Phase 1: COMPLETE (Data Infrastructure)**
+- Fully functional ETL pipeline using `nflreadpy` library
+- Automated incremental data fetching (only downloads new weeks)
+- Local storage: 108+ parquet files covering 2020-2025 NFL seasons
+- Streamlit dashboard with interactive filtering and visualizations
+- Data stored in `data/nfl/raw/` with naming: `player_stats_{SEASON}_week_{WEEK}.parquet`
+
+### **⏳ Phase 2: IN PROGRESS (Feature Engineering & ML Models)**
+- About to implement feature engineering (rolling averages, opponent adjustments, usage metrics)
+- Planning to build POB (Probability Over Baseline) and EVOB (Expected Value Over Baseline) models
+- Will use XGBoost/LightGBM for predictions
+- Training on 2020-2025 historical data
+
+### **📋 Phase 3: PLANNED (Explainable AI)**
+- SHAP values for feature importance
+- GPT integration for natural language explanations
+
+---
+
+## **Technical Architecture**
+
+### **Tech Stack:**
+- **Backend:** Python 3.11+
+- **Data Processing:** pandas, nflreadpy
+- **Storage:** Parquet files (columnar format, 10x smaller than CSV)
+- **Frontend:** Streamlit
+- **Visualization:** Plotly
+- **ML Libraries:** XGBoost, LightGBM, scikit-learn (planned)
+
+### **Current File Structure:**
+```
+Sports Analyzer/
+├── app.py                          # Streamlit dashboard
+├── data/
+│   └── nfl/
+│       ├── raw/                    # 108+ parquet files (2020-2025)
+│       ├── cleaned/                # Empty (future features)
+│       └── models/                 # Empty (future trained models)
+├── src/
+│   └── nfl/
+│       ├── nfl_pipeline.py         # Data fetching class
+│       ├── column_mappings.py      # Display name mappings
+│       ├── feature_engineer.py     # TO BE BUILT
+│       ├── ml_models.py            # TO BE BUILT
+│       └── model_trainer.py        # TO BE BUILT
+└── testing/
+    ├── api_test.py                 # API verification
+    └── feature_test.py             # TO BE BUILT
+```
+
+---
+
+## **Key Classes & Components**
+
+### **NFLDataPipeline (Existing)**
+- `get_last_downloaded_week()` - Finds most recent data
+- `fetch_player_stats()` - Gets data from nflverse API
+- `save_data()` - Writes parquet files
+- `run_pipeline()` - Main fetch/save orchestration
+
+### **Streamlit Dashboard (Existing)**
+- **Player Data Explorer:** Filter by season/week/position/team, view sorted tables
+- **Performance Trends:** Select player, visualize weekly stats with line charts
+- Defaults to most recent week, filters out inactive players
+
+### **Data Details:**
+- **114 columns per player record**
+- Includes: passing stats, rushing stats, receiving stats, fantasy points, advanced metrics (EPA, target share, etc.)
+- **~2,000-3,000 player records per week**
+
+---
+
+## **Current Chat Context**
+
+### **What We Just Discussed:**
+1. Condensed a 14-page progress report down to 10 pages with screenshot placements
+2. Switched to brainstorming mode for Phase 2 implementation
+3. Discussed how predictive features will be calculated:
+   - Rolling averages with exponential decay
+   - Opponent strength adjustments
+   - Usage metrics (snap/target share)
+4. Discussed ML model training strategy:
+   - Use all 5 years of data (2020-2025)
+   - Walk-forward validation (train on past, test on future)
+   - Compare XGBoost vs LightGBM
+   - Build separate POB (classification) and EVOB (regression) models
+
+### **Key Decisions Made:**
+- Keep code modular (separate files for feature engineering, models, training)
+- Create a test file (`feature_test.py`) to demonstrate calculations for a single player
+- Use position-specific models (QB vs RB vs WR need different features)
+- Store engineered features in `data/nfl/cleaned/`
+- Store trained models in `data/nfl/models/`
+
+---
+
+## **Key Design Principles**
+
+1. **Local-First:** No cloud dependencies, all data stored locally
+2. **Transparent:** Raw data never modified, stored exactly as received from API
+3. **Incremental:** Only fetch missing weeks, never re-download
+4. **Reproducible:** Same data + same code = same results
+5. **Explainable:** Show WHY predictions are made, not just the predictions
+
+---
+
+## **Project Goals**
+
+### **Technical Goals:**
+- Demonstrate practical ML in time-series forecasting
+- Build robust local data architecture
+- Implement explainable AI concepts
+
+### **Research Goals:**
+- Contribute to open-source sports analytics
+- Create framework for handling noisy sports data
+- Show proper uncertainty quantification
+
+### **Educational Goals:**
+- Comprehensive case study in data engineering + ML
+- Real-world application of CS principles
+
+---
+
+## **User Preferences (From Previous Chat):**
+- Simple, clear code over complicated one-liners
+- Concise comments explaining tricky parts
+- No redundant output messages
+- Favor readability over brevity
+- Incremental storage (never overwrite data)
+- Avoid overly formal language or unnecessary jargon
+
+---
+
+## **What's Next:**
+About to design and implement:
+1. `FeatureEngineer` class to calculate predictive features
+2. `MLModel` classes for POB and EVOB predictions
+3. `ModelTrainer` to train on historical data
+4. Test file to demonstrate calculations for a single player
+
+**Current Question:** User wants to understand feature calculation mechanics and training strategy before writing code.

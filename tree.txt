@@ -1,0 +1,25 @@
+.
+├── app.py
+├── data
+│   ├── mlb
+│   └── nfl
+│       ├── cleaned
+│       └── raw
+│           ├── player_stats_2020_week_1.parquet
+│           ├── player_stats_2020_week_2.parquet
+│           ├── player_stats_2020_week_3.parquet
+│           ├── ...
+│           └── player_stats_2025_week_5.parquet
+├── requirements.txt
+├── src
+│   └── nfl
+│       ├── __init__.py
+│       ├── nfl_pipeline.py
+│       └── __pycache__
+│           ├── __init__.py
+│           └── nfl_pipeline.py
+├── testing
+│   └── api test.py
+└── tree.txt
+
+10 directories, 103 files

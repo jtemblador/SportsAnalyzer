@@ -1,0 +1,37 @@
+Senior Design project notes
+
+10_21
+next steps:
+	1. Rolling Averages with Exponential Decay 
+		- EX: weighted_avg = (24.5*1.0 + 18.2*0.9 + 32.1*0.81 + 15.7*0.729) / (1.0 + 0.9 + 0.81 + 0.729)
+	2. Opponent Strength Adjustments (100 rush yards vs. the #1 run defense >> 100 yards vs. the #32 defense.)
+		1. Calculate league average rushing yards allowed per game (e.g., 120 yards)
+		2. Find opponent's average (e.g., KC allows 95 yards = strong defense)
+		3. Adjustment factor = opponent_avg / league_avg = 95/120 = 0.79
+		4. Adjusted baseline = player_baseline * adjustment_factor
+	3. Usage Metrics (Snap Share / Target Share) 
+			Week 1: 8 targets out of 35 team passes = 22.9% target share
+			Week 2: 10 targets out of 40 team passes = 25.0%
+			Week 3: 12 targets out of 38 team passes = 31.6%
+		- Trend: Target share is increasing → player becoming more involved in offense → predict higher future performance.
+	4. POB (Probability Over Baseline) (binary classifier: Will this player beat their average)
+		- Player's rolling avg: 15.2 fantasy points (IS IT BEST TO USE FANTASY POINTS FOR CALC ROLLING AVG?)
+		- Model predicts: 72% chance they score MORE than 15.2 points
+		- POB = 0.72 (72% probability)
+	5. EVOB (Expected Value Over Baseline) (regression model: By HOW MUCH will they beat/miss their average)
+	
+	Training Data Questions
+	- We will train separate models on 4, 5, 6, 7, and 8 years of data to see where the optimal training years set is. 
+	
+	ML Models to Train:
+		For POB (Binary Classification):
+			- Logistic Regression (simple baseline)
+			- XGBoost Classifier (probably best)
+			- LightGBM Classifier (alternative, faster than XGBoost)
+
+		For EVOB (Regression):
+			- Linear Regression (simple baseline)
+			- XGBoost Regressor (probably best)
+			- LightGBM Regressor (alternative, faster)
+			
+
