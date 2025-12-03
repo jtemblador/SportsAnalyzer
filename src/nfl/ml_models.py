@@ -958,25 +958,53 @@ class NFLModelPipeline:
         print("\n" + "="*70)
         print("NFL MODEL TRAINING PIPELINE")
         print("="*70)
-        
+
+        # Check for existing models
+        existing_models = list(self.model_dir.glob("*.joblib"))
+        if existing_models:
+            print(f"⚡ Found {len(existing_models)} existing models - will skip already-trained models")
+
         # Load all data
         df = self.load_features_and_targets()
-        
+
+        total_trained = 0
+        total_skipped = 0
+
         # Train for each position
         for position in ['QB', 'RB', 'WR', 'TE', 'K']:
+            # Check which models already exist for this position
+            position_stats = self.position_stats.get(position, [])
+            models_needed = []
+
+            for stat in position_stats:
+                for model_type in ['stat', 'evob'] + (['pob'] if 'fantasy_points' in stat else []):
+                    model_path = self.model_dir / f"{position}_{stat}_{model_type}.joblib"
+                    if not model_path.exists():
+                        models_needed.append(f"{stat}_{model_type}")
+
+            if not models_needed:
+                print(f"\n⏭️  Skipping {position} - all models already trained")
+                total_skipped += len(position_stats) * 2  # stat + evob (+ pob for fantasy)
+                continue
+
+            print(f"\n📝 {position}: Training {len(models_needed)} models (skipping {len(position_stats) * 2 - len(models_needed)} existing)")
+
             models = self.train_position_models(position, df)
-            
+
             if models:
                 self.models[position] = models
-                
+
                 # Save models
                 for model_name, model in models.items():
                     model_path = self.model_dir / f"{position}_{model_name}.joblib"
                     model.save_model(str(model_path))
-        
+                    total_trained += 1
+
         print("\n" + "="*70)
         print("✅ MODEL TRAINING COMPLETE")
         print("="*70)
+        print(f"Models trained: {total_trained}")
+        print(f"Models skipped (already exist): {total_skipped}")
         print(f"Models saved to: {self.model_dir}")
     
     def generate_predictions(self, season: int, week: int):

@@ -50,8 +50,9 @@ def main():
     print_header("STEP 1/4: Generating V2 Features")
     print("Creating v2_variance_trends feature set...")
     print("This will generate features WITH variance and trend columns.")
-    print("\nGenerating improved features for ALL weeks (2020-2025)...")
-    print("Time: ~5-10 minutes\n")
+    print("\n⚡ SMART RESUME: Already-generated weeks will be skipped automatically!")
+    print("Generating improved features for ALL weeks (2020-2025)...")
+    print("Time: ~5-10 minutes (faster if resuming)\n")
 
     version = "v2_variance_trends_maeUNKNOWN"  # Will update after validation
 
@@ -62,8 +63,14 @@ def main():
     )
 
     try:
+        # This will automatically skip already-processed weeks
         engineer.engineer_all_features(start_season=2020, end_season=2025)
         print("\n✅ Feature generation complete!")
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Process interrupted by user (Ctrl+C)")
+        print("✓ Progress saved - already-processed weeks are preserved")
+        print("✓ Run this script again to resume from where you left off")
+        return 1
     except Exception as e:
         print(f"\n❌ Feature generation failed: {e}")
         return 1
@@ -71,7 +78,8 @@ def main():
     # Step 2: Train models
     print_header("STEP 2/4: Training Models")
     print("Training all 40 models with improved features...")
-    print("Time: ~10-15 minutes\n")
+    print("⚡ SMART RESUME: Already-trained models will be skipped automatically!")
+    print("Time: ~10-15 minutes (faster if resuming)\n")
 
     pipeline = NFLModelPipeline(
         data_dir='./data/nfl',
@@ -82,6 +90,11 @@ def main():
     try:
         pipeline.train_all_models()
         print("\n✅ Model training complete!")
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Process interrupted by user (Ctrl+C)")
+        print("✓ Progress saved - already-trained models are preserved")
+        print("✓ Run this script again to resume from where you left off")
+        return 1
     except Exception as e:
         print(f"\n❌ Model training failed: {e}")
         return 1
