@@ -99,9 +99,44 @@ def main():
         print(f"\n❌ Model training failed: {e}")
         return 1
 
+    # Load all trained models before generating predictions
+    print("\n🔄 Loading all trained models for prediction...")
+    from nfl.ml_models import POBModel, EVOBModel, StatPredictor
+    import joblib
+
+    model_files = list(pipeline.model_dir.glob("*.joblib"))
+    pipeline.models = {}  # Reset to empty
+
+    for model_file in model_files:
+        parts = model_file.stem.split('_')
+        position = parts[0]
+        model_type = parts[-1]
+
+        if position not in pipeline.models:
+            pipeline.models[position] = {}
+
+        model_name = '_'.join(parts[1:])
+
+        if model_type == 'pob':
+            stat = '_'.join(parts[1:-1])
+            model = POBModel(position, stat)
+        elif model_type == 'evob':
+            stat = '_'.join(parts[1:-1])
+            model = EVOBModel(position, stat)
+        elif model_type == 'stat':
+            stat = '_'.join(parts[1:-1])
+            model = StatPredictor(position, stat)
+        else:
+            continue
+
+        model.load_model(str(model_file))
+        pipeline.models[position][model_name] = model
+
+    print(f"✓ Loaded {len(model_files)} models for {len(pipeline.models)} positions\n")
+
     # Step 3: Generate test predictions
     print_header("STEP 3/4: Generating Test Predictions")
-    print("Generating predictions for Weeks 10-12...\n")
+    print("Generating predictions for 2025 Weeks 10-12...\n")
 
     for week in [10, 11, 12]:
         try:
@@ -119,7 +154,7 @@ def main():
 
     # Run comparison
     subprocess.run([
-        "python", "testing/compare_versions.py",
+        "python3", "testing/compare_versions.py",
         "v1_baseline_mae5.14",
         version,
         "10", "11", "12"
@@ -135,7 +170,7 @@ def main():
     print("📊 Review the validation results above to see if v2 improved!")
     print()
     print("Key metrics to check:")
-    print("  - v1 MAE: 5.14 points")
+    print("  - v1 MAE: 5.14 points (baseline)")
     print("  - v2 MAE: ??? points (check output above)")
     print()
     print("If v2 shows improvement, you can rename the folders to include actual MAE:")

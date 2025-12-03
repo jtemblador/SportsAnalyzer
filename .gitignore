@@ -44,16 +44,20 @@ wheels/
 # Project-specific: Temporary/Working Files
 claude_prompt.txt
 prompt_rules.txt
+prompt.txt
 *.tmp
 *.temp
 
 # Project-specific: Data Files (too large for git)
-data/nfl/raw/*.parquet
-data/nfl/cleaned/*.parquet
-data/nfl/predictions/*.parquet
+# Note: Commented out to allow versioned data folders for cross-machine consistency
+# data/nfl/raw/*.parquet
+# data/nfl/cleaned/*.parquet
+# data/nfl/predictions/*.parquet
+# data/nfl/features/*/*.parquet
 
 # Project-specific: Model Files (too large for git)
-data/nfl/models/*.joblib
+# Note: Commented out to allow versioned model folders for cross-machine consistency
+# data/nfl/models/*.joblib
 *.pkl
 *.pickle
 *.h5

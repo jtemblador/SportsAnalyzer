@@ -10,7 +10,7 @@ from pathlib import Path
 
 def run_validation(version, weeks):
     """Run validation for a specific version"""
-    cmd = ["python", "testing/validate_accuracy.py", version] + [str(w) for w in weeks]
+    cmd = ["python3", "testing/validate_accuracy.py", version] + [str(w) for w in weeks]
 
     print(f"\n{'='*80}")
     print(f"Running validation for: {version}")
