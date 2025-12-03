@@ -16,24 +16,28 @@ class FeatureEngineer:
     Transforms raw player statistics into predictive features for ML models.
     Handles rolling averages, opponent adjustments, usage trends, and context.
     """
-    
-    def __init__(self, raw_data_dir='./data/nfl/raw', cleaned_data_dir='./data/nfl/cleaned'):
+
+    def __init__(self, raw_data_dir='./data/nfl/raw', features_dir='./data/nfl/features', version='v1_baseline_mae5.14'):
         """
         Initialize the FeatureEngineer.
-        
+
         Args:
             raw_data_dir: Directory containing raw parquet files
-            cleaned_data_dir: Directory to save engineered features
+            features_dir: Base directory for features (will create versioned subdirectory)
+            version: Feature version identifier (e.g., 'v1_baseline_mae5.14', 'v2_variance_trends')
         """
         self.raw_data_dir = raw_data_dir
-        self.cleaned_data_dir = cleaned_data_dir
-        
-        # Create cleaned directory if it doesn't exist
+        self.features_base_dir = features_dir
+        self.version = version
+
+        # Create versioned subdirectory
+        self.cleaned_data_dir = str(Path(features_dir) / version)
         Path(self.cleaned_data_dir).mkdir(parents=True, exist_ok=True)
-        
+
         print("✓ FeatureEngineer initialized")
+        print(f"  Version: {version}")
         print(f"  Raw data: {self.raw_data_dir}")
-        print(f"  Cleaned data: {self.cleaned_data_dir}")
+        print(f"  Feature output: {self.cleaned_data_dir}")
     
     # ===== UTILITY METHODS =====
     
@@ -74,25 +78,64 @@ class FeatureEngineer:
         
         return pd.DataFrame(games) if games else pd.DataFrame()
     
-    def calculate_rolling_average(self, values, decay_factor=0.9):
+    def calculate_rolling_average(self, values, decay_factor=0.85):
         """
         Calculate weighted rolling average with exponential decay.
-        
+        IMPROVED: Stronger decay (0.85) to emphasize recent games more.
+
         Args:
             values: List of values (most recent first)
-            decay_factor: Decay rate (0.9 = 10% decay per game)
-        
+            decay_factor: Decay rate (0.85 = 15% decay per game, was 0.9)
+
         Returns:
             Weighted average
         """
         if len(values) == 0:
             return 0.0
-        
+
         weights = [decay_factor ** i for i in range(len(values))]
         weighted_sum = sum(v * w for v, w in zip(values, weights))
         weight_sum = sum(weights)
-        
+
         return weighted_sum / weight_sum if weight_sum > 0 else 0.0
+
+    def calculate_variance(self, values):
+        """
+        Calculate standard deviation for consistency/boom-bust indicator.
+
+        Args:
+            values: List of values (most recent first)
+
+        Returns:
+            Standard deviation (0 if < 2 games)
+        """
+        if len(values) < 2:
+            return 0.0
+
+        return np.std(values)
+
+    def calculate_recent_trend(self, values, recent_n=3):
+        """
+        Calculate trend from recent N games vs previous games.
+        Positive = improving, Negative = declining
+
+        Args:
+            values: List of values (most recent first)
+            recent_n: Number of recent games to compare
+
+        Returns:
+            Percentage change from old to recent average
+        """
+        if len(values) < recent_n + 1:
+            return 0.0
+
+        recent_avg = np.mean(values[:recent_n])
+        old_avg = np.mean(values[recent_n:])
+
+        if old_avg == 0:
+            return 0.0
+
+        return (recent_avg - old_avg) / old_avg
     
     def get_opponent_defense_rank(self, opponent_team, position, season, week):
         """
@@ -162,10 +205,10 @@ class FeatureEngineer:
     # ===== POSITION-SPECIFIC FEATURE BUILDERS =====
     
     def engineer_qb_features(self, player_row, player_history, season, week):
-        """Calculate QB-specific features."""
+        """Calculate QB-specific features (IMPROVED with variance & trends)."""
         features = self._base_features(player_row, season, week)
-        
-        # Rolling averages
+
+        # Rolling averages (with stronger decay = more recent weight)
         features['rolling_avg_passing_yds'] = self.calculate_rolling_average(
             player_history['passing_yards'].tolist()
         )
@@ -181,23 +224,39 @@ class FeatureEngineer:
         features['rolling_avg_rushing_yds'] = self.calculate_rolling_average(
             player_history['rushing_yards'].tolist()
         )
-        
+
+        # NEW: Variance/Consistency features (boom-bust indicator)
+        features['fantasy_pts_variance'] = self.calculate_variance(
+            player_history['fantasy_points_ppr'].tolist()
+        )
+        features['passing_yds_variance'] = self.calculate_variance(
+            player_history['passing_yards'].tolist()
+        )
+
+        # NEW: Recent form trends (last 3 games vs older games)
+        features['fantasy_pts_trend'] = self.calculate_recent_trend(
+            player_history['fantasy_points_ppr'].tolist()
+        )
+        features['passing_yds_trend'] = self.calculate_recent_trend(
+            player_history['passing_yards'].tolist()
+        )
+
         # Opponent
         features['opponent_pass_defense_rank'] = self.get_opponent_defense_rank(
             player_row['opponent_team'], 'QB', season, week
         )
-        
+
         # Usage trend
         features['pass_attempts_trend'] = self.calculate_usage_trend(
             player_history, 'attempts'
         )
-        
+
         return features
     
     def engineer_rb_features(self, player_row, player_history, season, week):
-        """Calculate RB-specific features."""
+        """Calculate RB-specific features (IMPROVED)."""
         features = self._base_features(player_row, season, week)
-        
+
         # Rolling averages
         features['rolling_avg_rushing_yds'] = self.calculate_rolling_average(
             player_history['rushing_yards'].tolist()
@@ -214,12 +273,28 @@ class FeatureEngineer:
         features['rolling_avg_receiving_yds'] = self.calculate_rolling_average(
             player_history['receiving_yards'].tolist()
         )
-        
+
+        # NEW: Variance features
+        features['fantasy_pts_variance'] = self.calculate_variance(
+            player_history['fantasy_points_ppr'].tolist()
+        )
+        features['rushing_yds_variance'] = self.calculate_variance(
+            player_history['rushing_yards'].tolist()
+        )
+
+        # NEW: Recent form trends
+        features['fantasy_pts_trend'] = self.calculate_recent_trend(
+            player_history['fantasy_points_ppr'].tolist()
+        )
+        features['carries_trend'] = self.calculate_recent_trend(
+            player_history['carries'].tolist()
+        )
+
         # Opponent
         features['opponent_rush_defense_rank'] = self.get_opponent_defense_rank(
             player_row['opponent_team'], 'RB', season, week
         )
-        
+
         # Usage trends
         features['carry_share_trend'] = self.calculate_usage_trend(
             player_history, 'carries'
@@ -227,13 +302,13 @@ class FeatureEngineer:
         features['target_trend'] = self.calculate_usage_trend(
             player_history, 'targets'
         )
-        
+
         return features
     
     def engineer_wr_features(self, player_row, player_history, season, week):
-        """Calculate WR-specific features."""
+        """Calculate WR-specific features (IMPROVED)."""
         features = self._base_features(player_row, season, week)
-        
+
         # Rolling averages
         features['rolling_avg_receiving_yds'] = self.calculate_rolling_average(
             player_history['receiving_yards'].tolist()
@@ -250,12 +325,28 @@ class FeatureEngineer:
         features['rolling_avg_air_yards'] = self.calculate_rolling_average(
             player_history['receiving_air_yards'].tolist()
         )
-        
+
+        # NEW: Variance features
+        features['fantasy_pts_variance'] = self.calculate_variance(
+            player_history['fantasy_points_ppr'].tolist()
+        )
+        features['receiving_yds_variance'] = self.calculate_variance(
+            player_history['receiving_yards'].tolist()
+        )
+
+        # NEW: Recent form trends
+        features['fantasy_pts_trend'] = self.calculate_recent_trend(
+            player_history['fantasy_points_ppr'].tolist()
+        )
+        features['targets_trend'] = self.calculate_recent_trend(
+            player_history['targets'].tolist()
+        )
+
         # Opponent
         features['opponent_pass_defense_rank'] = self.get_opponent_defense_rank(
             player_row['opponent_team'], 'WR', season, week
         )
-        
+
         # Usage trends
         features['target_share_trend'] = self.calculate_usage_trend(
             player_history, 'target_share'
@@ -263,13 +354,13 @@ class FeatureEngineer:
         features['air_yards_share_trend'] = self.calculate_usage_trend(
             player_history, 'air_yards_share'
         )
-        
+
         return features
     
     def engineer_te_features(self, player_row, player_history, season, week):
-        """Calculate TE-specific features."""
+        """Calculate TE-specific features (IMPROVED)."""
         features = self._base_features(player_row, season, week)
-        
+
         # Rolling averages (same as WR but different patterns)
         features['rolling_avg_receiving_yds'] = self.calculate_rolling_average(
             player_history['receiving_yards'].tolist()
@@ -283,17 +374,33 @@ class FeatureEngineer:
         features['rolling_avg_targets'] = self.calculate_rolling_average(
             player_history['targets'].tolist()
         )
-        
+
+        # NEW: Variance features
+        features['fantasy_pts_variance'] = self.calculate_variance(
+            player_history['fantasy_points_ppr'].tolist()
+        )
+        features['receiving_yds_variance'] = self.calculate_variance(
+            player_history['receiving_yards'].tolist()
+        )
+
+        # NEW: Recent form trends
+        features['fantasy_pts_trend'] = self.calculate_recent_trend(
+            player_history['fantasy_points_ppr'].tolist()
+        )
+        features['targets_trend'] = self.calculate_recent_trend(
+            player_history['targets'].tolist()
+        )
+
         # Opponent
         features['opponent_pass_defense_rank'] = self.get_opponent_defense_rank(
             player_row['opponent_team'], 'TE', season, week
         )
-        
+
         # Usage trends
         features['target_share_trend'] = self.calculate_usage_trend(
             player_history, 'target_share'
         )
-        
+
         return features
     
     def engineer_k_features(self, player_row, player_history, season, week):

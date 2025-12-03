@@ -1,0 +1,227 @@
+================================================================================
+PRE-FLIGHT CHECKLIST - retrain_v2.py
+================================================================================
+Verified: December 2, 2025
+Status: ✅ READY TO RUN
+
+================================================================================
+✅ CODE VERIFICATION
+================================================================================
+
+✓ Python Syntax Check
+  - src/nfl/feature_engineer.py compiles
+  - src/nfl/ml_models.py compiles
+  - retrain_v2.py compiles
+  - No syntax errors detected
+
+✓ Import Check
+  - FeatureEngineer imports successfully
+  - NFLModelPipeline imports successfully
+  - All dependencies available
+
+✓ Parameter Verification
+  - FeatureEngineer has 'version' parameter
+  - NFLModelPipeline has 'version' parameter
+  - Both create versioned subdirectories correctly
+
+✓ Path Resolution
+  - FeatureEngineer outputs to: data/nfl/features/{version}/
+  - NFLModelPipeline reads from: data/nfl/features/{version}/
+  - NFLModelPipeline saves to: data/nfl/models/{version}/
+  - Predictions save to: data/nfl/predictions/{version}/
+
+================================================================================
+✅ DATA STRUCTURE VERIFICATION
+================================================================================
+
+Current Structure:
+  data/nfl/
+  ├── raw/                                 ✓ 103 files (original stats)
+  ├── features/
+  │   └── v1_baseline_mae5.14/             ✓ 102 files (preserved)
+  ├── models/
+  │   └── v1_baseline_mae5.14/             ✓ 40 models (preserved)
+  └── predictions/
+      └── v1_baseline_mae5.14/             ✓ 11 files (preserved)
+
+V1 Data Status:
+  - Features: 102 files preserved
+  - Models: 40 models preserved
+  - Predictions: 11 files preserved
+  - ⚠️  V1 features have MIXED schemas (weeks 12-13 have variance, older don't)
+  - This is OK - v2 will regenerate ALL with consistent schema
+
+After retrain_v2.py:
+  data/nfl/
+  ├── features/
+  │   ├── v1_baseline_mae5.14/             ← Preserved
+  │   └── v2_variance_trends_maeUNKNOWN/   ← NEW (102 files, consistent)
+  ├── models/
+  │   ├── v1_baseline_mae5.14/             ← Preserved
+  │   └── v2_variance_trends_maeUNKNOWN/   ← NEW (40 models)
+  └── predictions/
+      ├── v1_baseline_mae5.14/             ← Preserved
+      └── v2_variance_trends_maeUNKNOWN/   ← NEW (3 files: weeks 10-12)
+
+================================================================================
+✅ BUG FIXES APPLIED
+================================================================================
+
+Bug #1: Variance Feature Handling
+  Location: src/nfl/ml_models.py lines 1008-1013
+  Fix: Auto-fill missing variance/trend features with 0
+  Status: ✓ FIXED
+  Test: Verified in test_fixes.py
+
+Bug #2: Week Offset Error
+  Location: src/nfl/ml_models.py lines 1076, 1128, 1138
+  Fix: Removed all "+ 1" from week assignments and filenames
+  Status: ✓ FIXED
+  Test: Verified Week 10 saves as week_10.parquet
+
+Bug #3: Feature Schema Mismatch
+  Location: retrain_v2.py (removed deletion, added versioning)
+  Fix: V2 features in separate folder, regenerates ALL weeks
+  Status: ✓ FIXED
+  Test: Verified versioned paths work correctly
+
+================================================================================
+✅ FEATURE SCHEMA VERIFICATION
+================================================================================
+
+V1 Features (data/nfl/features/v1_baseline_mae5.14/):
+  - Columns: 34-42 (MIXED - bug from before)
+  - Decay Factor: 0.9
+  - Has Variance: Partially (weeks 12-13 only)
+  - Status: Preserved, will NOT be modified
+
+V2 Features (to be generated):
+  - Columns: 42 (CONSISTENT - all weeks)
+  - Decay Factor: 0.85
+  - Has Variance: Yes (all weeks)
+  - Location: data/nfl/features/v2_variance_trends_maeUNKNOWN/
+
+New Features in V2:
+  - fantasy_pts_variance (boom/bust indicator)
+  - passing_yds_variance / rushing_yds_variance / receiving_yds_variance
+  - fantasy_pts_trend (hot/cold streak)
+  - passing_yds_trend / targets_trend / carries_trend
+
+================================================================================
+⏱️  EXPECTED RUNTIME
+================================================================================
+
+Step 1: Feature Generation
+  - Process: Generate 102 feature files
+  - Time: ~5-10 minutes
+  - Output: data/nfl/features/v2_variance_trends_maeUNKNOWN/
+
+Step 2: Model Training
+  - Process: Train 40 ML models (XGBoost, LightGBM, CatBoost, RandomForest)
+  - Time: ~10-15 minutes
+  - Output: data/nfl/models/v2_variance_trends_maeUNKNOWN/
+
+Step 3: Prediction Generation
+  - Process: Generate predictions for weeks 10, 11, 12
+  - Time: ~30 seconds
+  - Output: data/nfl/predictions/v2_variance_trends_maeUNKNOWN/
+
+Step 4: Validation & Comparison
+  - Process: Compare v1 vs v2 accuracy
+  - Time: ~30 seconds
+  - Output: Terminal output with MAE, RMSE, R² comparison
+
+Total Expected Time: ~20-25 minutes
+
+================================================================================
+📊 SUCCESS CRITERIA
+================================================================================
+
+The script will SUCCEED if:
+  ✓ All 102 v2 feature files generated
+  ✓ All 40 models trained without errors
+  ✓ Predictions generated for weeks 10, 11, 12
+  ✓ Validation comparison completes
+
+You should see:
+  ✓ QB, RB, WR, TE, K all train successfully (no "insufficient data")
+  ✓ Predictions match validation weeks (no "no matching players")
+  ✓ V2 MAE compared to v1 MAE: 5.14
+
+Possible Outcomes:
+  - V2 MAE < 5.14 → V2 is better! ✅
+  - V2 MAE ≈ 5.14 → V2 is similar (variance/trends don't help much)
+  - V2 MAE > 5.14 → V2 is worse (features hurt performance)
+
+================================================================================
+🚨 WHAT TO WATCH FOR
+================================================================================
+
+Normal Messages (OK):
+  - "Skipped (already exist): 0 weeks" ← Good! Generating all new
+  - "ℹ️  Filled missing {feature} with 0" ← Expected for new players
+  - "Early stopping, best iteration is" ← LightGBM optimization
+
+Warning Messages (Usually OK):
+  - "⚠️ Warning: No variance in targets" ← Some stats have no variance
+  - Low R² values ← Expected for sports prediction
+
+Error Messages (BAD - stop and report):
+  - "❌ Feature generation failed" ← Import/path error
+  - "❌ Model training failed" ← Data/feature mismatch
+  - "⚠️  Error predicting..." with feature names ← Missing features
+  - Python stack traces ← Code bug
+
+If You See Errors:
+  1. Stop the script (Ctrl+C)
+  2. Copy the full error message
+  3. Check which step failed
+  4. Report back before re-running
+
+================================================================================
+✅ FINAL CHECKS
+================================================================================
+
+Before Running:
+  ✓ Python syntax: Valid
+  ✓ Imports: Working
+  ✓ Versioning: Configured
+  ✓ Data structure: Verified
+  ✓ V1 data: Preserved
+  ✓ Bug fixes: Applied
+  ✓ Test folders: Cleaned up
+
+Ready to Run:
+  ✓ All prerequisites met
+  ✓ No blockers identified
+  ✓ Expected runtime: 20-25 minutes
+
+================================================================================
+🚀 READY TO LAUNCH
+================================================================================
+
+Command to run:
+  cd "/home/j0e/Projects/Sports Analyzer"
+  python retrain_v2.py
+
+When prompted "Proceed with v2 training? (y/n):", type: y
+
+Then wait ~20-25 minutes for completion.
+
+================================================================================
+📝 AFTER COMPLETION
+================================================================================
+
+If successful, you'll have:
+  - data/nfl/features/v2_variance_trends_maeUNKNOWN/  (102 files)
+  - data/nfl/models/v2_variance_trends_maeUNKNOWN/    (40 models)
+  - data/nfl/predictions/v2_variance_trends_maeUNKNOWN/ (3 files)
+
+Check the validation output to see if v2 improved!
+
+If v2 is better, rename folders to include actual MAE:
+  mv data/nfl/features/v2_variance_trends_maeUNKNOWN data/nfl/features/v2_variance_trends_maeX.XX
+  mv data/nfl/models/v2_variance_trends_maeUNKNOWN data/nfl/models/v2_variance_trends_maeX.XX
+  mv data/nfl/predictions/v2_variance_trends_maeUNKNOWN data/nfl/predictions/v2_variance_trends_maeX.XX
+
+================================================================================

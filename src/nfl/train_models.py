@@ -20,23 +20,29 @@ def main():
     """Main training function"""
 
     print("="*70)
-    print("NFL ML MODEL TRAINING")
+    print("NFL ML MODEL TRAINING (VERSIONED)")
     print("="*70)
     print(f"Started at: {datetime.now()}")
+    print()
+
+    # Allow version to be specified via command line
+    version = "v2_variance_trends"
+    if len(sys.argv) > 1:
+        version = sys.argv[1]
+
+    print(f"🏷️  Version: {version}")
     print()
 
     # Set up paths - use project root data directory
     project_root = Path(__file__).parent.parent.parent
     data_dir = project_root / "data" / "nfl"
-    model_dir = data_dir / "models"  # Models saved to data/nfl/models
+    model_dir = data_dir / "models"  # Models saved to data/nfl/models/[version]
 
-    # Create directories if they don't exist
-    model_dir.mkdir(parents=True, exist_ok=True)
-
-    # Initialize pipeline with correct paths
+    # Initialize pipeline with versioning
     pipeline = NFLModelPipeline(
         data_dir=str(data_dir),
-        model_dir=str(model_dir)
+        model_dir=str(model_dir),
+        version=version
     )
 
     print("📊 Training on ALL available data (2020-2025)")

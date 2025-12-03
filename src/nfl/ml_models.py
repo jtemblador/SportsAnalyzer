@@ -641,49 +641,70 @@ class NFLModelPipeline:
     Handles data loading, feature selection, training, and prediction storage.
     """
     
-    def __init__(self, data_dir: str = "./data/nfl", model_dir: str = "./data/nfl/models"):
+    def __init__(self, data_dir: str = "./data/nfl", model_dir: str = "./data/nfl/models", version: str = "v2_variance_trends"):
         """
         Initialize the model pipeline.
-        
+
         Args:
             data_dir: Base directory for NFL data
             model_dir: Directory to save trained models
+            version: Version identifier for this model run (e.g., "v2_variance_trends")
         """
         self.data_dir = Path(data_dir)
-        self.model_dir = Path(model_dir)
-        self.feature_dir = self.data_dir / "cleaned"
-        self.prediction_dir = self.data_dir / "predictions"
+        self.version = version
+
+        # Use versioned subdirectories for models, features, and predictions
+        self.model_dir = Path(model_dir) / version
+        self.feature_dir = self.data_dir / "features" / version  # CHANGED: now versioned
+        self.prediction_dir = self.data_dir / "predictions" / version
         self.raw_dir = self.data_dir / "raw"
-        
+
         # Create directories
         self.model_dir.mkdir(parents=True, exist_ok=True)
         self.prediction_dir.mkdir(parents=True, exist_ok=True)
+
+        print(f"✓ Pipeline initialized with version: {version}")
+        print(f"  Models: {self.model_dir}")
+        print(f"  Features: {self.feature_dir}")
+        print(f"  Predictions: {self.prediction_dir}")
         
-        # Position-specific feature sets
+        # Position-specific feature sets (UPDATED with variance & trend features)
         self.position_features = {
             'QB': [
                 'rolling_avg_passing_yds', 'rolling_avg_passing_tds',
                 'rolling_avg_interceptions', 'rolling_avg_completions',
                 'rolling_avg_rushing_yds', 'opponent_pass_defense_rank',
-                'pass_attempts_trend', 'games_in_history'
+                'pass_attempts_trend', 'games_in_history',
+                # NEW features:
+                'fantasy_pts_variance', 'passing_yds_variance',
+                'fantasy_pts_trend', 'passing_yds_trend'
             ],
             'RB': [
                 'rolling_avg_rushing_yds', 'rolling_avg_rushing_tds',
                 'rolling_avg_carries', 'rolling_avg_receptions',
                 'rolling_avg_receiving_yds', 'opponent_rush_defense_rank',
-                'carry_share_trend', 'target_trend', 'games_in_history'
+                'carry_share_trend', 'target_trend', 'games_in_history',
+                # NEW features:
+                'fantasy_pts_variance', 'rushing_yds_variance',
+                'fantasy_pts_trend', 'carries_trend'
             ],
             'WR': [
                 'rolling_avg_receiving_yds', 'rolling_avg_receiving_tds',
                 'rolling_avg_receptions', 'rolling_avg_targets',
                 'rolling_avg_air_yards', 'opponent_pass_defense_rank',
-                'target_share_trend', 'air_yards_share_trend', 'games_in_history'
+                'target_share_trend', 'air_yards_share_trend', 'games_in_history',
+                # NEW features:
+                'fantasy_pts_variance', 'receiving_yds_variance',
+                'fantasy_pts_trend', 'targets_trend'
             ],
             'TE': [
                 'rolling_avg_receiving_yds', 'rolling_avg_receiving_tds',
                 'rolling_avg_receptions', 'rolling_avg_targets',
                 'opponent_pass_defense_rank', 'target_share_trend',
-                'games_in_history'
+                'games_in_history',
+                # NEW features:
+                'fantasy_pts_variance', 'receiving_yds_variance',
+                'fantasy_pts_trend', 'targets_trend'
             ],
             'K': [
                 'rolling_avg_fg_made', 'rolling_avg_fg_att',
@@ -980,11 +1001,18 @@ class NFLModelPipeline:
         predictions = []
         
         for position in self.models.keys():
-            pos_df = features_df[features_df['position'] == position]
-            
+            pos_df = features_df[features_df['position'] == position].copy()
+
             if len(pos_df) == 0:
                 continue
-            
+
+            # Fill missing variance/trend features with 0 (for prediction time when history is limited)
+            for feature in self.position_features[position]:
+                if feature not in pos_df.columns:
+                    if 'variance' in feature or 'trend' in feature:
+                        pos_df[feature] = 0.0
+                        print(f"  ℹ️  Filled missing {feature} with 0 for {position}")
+
             feature_cols = [col for col in self.position_features[position] if col in pos_df.columns]
 
             if not feature_cols:
@@ -1053,7 +1081,7 @@ class NFLModelPipeline:
                             'team': row['team'],
                             'opponent': row['opponent_team'],
                             'season': season,
-                            'week': week + 1,  # Predicting next week
+                            'week': week,
                             'stat': stat_name,
                             'model_type': 'evob',
                             'predicted_value': pred_value[i],
@@ -1105,17 +1133,17 @@ class NFLModelPipeline:
                             'team': row['team'],
                             'opponent': row['opponent_team'],
                             'season': season,
-                            'week': week + 1,
+                            'week': week,
                             'stat': stat_name,
                             'model_type': 'pob',
                             'probability_over': prob[i],
                             'baseline': row[baseline_col]
                         })
-        
+
         # Save predictions
         if predictions:
             pred_df = pd.DataFrame(predictions)
-            pred_file = self.prediction_dir / f"predictions_{season}_week_{week+1}.parquet"
+            pred_file = self.prediction_dir / f"predictions_{season}_week_{week}.parquet"
             pred_df.to_parquet(pred_file, index=False)
             print(f"Saved {len(pred_df)} predictions to {pred_file}")
         
