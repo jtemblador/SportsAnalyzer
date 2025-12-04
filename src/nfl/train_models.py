@@ -2,8 +2,15 @@
 """
 File: src/nfl/train_models.py
 
-Train NFL ML models on all available data and generate predictions.
-This script uses all 2020-2025 data for maximum accuracy.
+Generic training script that can train ANY version of NFL ML models.
+
+VERSION: Version-Agnostic
+Accepts version as command line argument:
+  python src/nfl/train_models.py v1_baseline_mae5.14
+  python src/nfl/train_models.py v2_variance_trends_mae4.66
+
+Default version: v2_variance_trends (see line 29)
+Uses: ml_models.py (version-agnostic model classes)
 """
 
 import sys

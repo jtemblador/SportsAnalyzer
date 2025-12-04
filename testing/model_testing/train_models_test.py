@@ -29,7 +29,7 @@ def main():
     # Set up paths - use project root data directory
     project_root = Path(__file__).parent.parent.parent
     data_dir = project_root / "data" / "nfl"
-    model_dir = project_root / "testing" / "model_testing" / "models"
+    model_dir = data_dir / "models"
 
     # Create directories if they don't exist
     model_dir.mkdir(parents=True, exist_ok=True)

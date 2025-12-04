@@ -3,6 +3,15 @@ File: src/nfl/feature_engineer.py
 
 FeatureEngineer class for calculating predictive features from raw NFL stats.
 Processes all historical data (2020-2025) and saves engineered features.
+
+VERSION: V2 (Current)
+Contains V2 improvements:
+- Stronger decay factor (0.85 vs 0.9) - emphasizes recent 3 games
+- Variance features - identifies boom/bust players
+- Recent trend features - captures hot/cold streaks
+- Generates 42 feature columns (V1 had 34)
+
+Used by: v2_retrain.py
 """
 
 import pandas as pd

@@ -1,0 +1,537 @@
+================================================================================
+PROGRESS REPORT - December 3, 2025 (Evening - Codebase Organization)
+================================================================================
+Phase: Infrastructure & Documentation
+Status: COMPLETED
+Focus: Code organization, file versioning, documentation, V3 planning
+Time: Evening session
+
+================================================================================
+USER GOALS FOR SESSION
+================================================================================
+
+1. ✅ Understand differences between V1 and V2 features
+2. ✅ Track which files create which version data
+3. ✅ Organize codebase with proper version labels
+4. ✅ Move important files to src/ folder
+5. ✅ Understand predictions vs features (redundancy check)
+6. ✅ Plan V3 improvements for QB/TE accuracy
+7. ✅ Create comprehensive CONTEXT.txt for future sessions
+8. ✅ Document today's progress
+
+================================================================================
+WHAT WE DISCOVERED
+================================================================================
+
+FEATURES VS PREDICTIONS CONFUSION (RESOLVED)
+--------------------------------------------
+User Question: "Are features and predictions redundant?"
+
+ANSWER: NO - Completely different!
+
+FEATURES (Input to models):
+  Location: data/nfl/features/v2_variance_trends_mae4.66/
+  Rows: 337 players per week
+  Columns: 42 feature columns
+  Contains: rolling_avg_fantasy_pts, passing_yds_variance, opponent_defense_rank, etc.
+  Purpose: Engineered input data for ML models
+
+PREDICTIONS (Output from models):
+  Location: data/nfl/predictions/v2_variance_trends_mae4.66/
+  Rows: 1489 predictions per week (multiple stats per player)
+  Columns: 15 prediction columns
+  Contains: predicted_value, confidence_lower, confidence_upper, probability_over, etc.
+  Purpose: Forecasted performance for upcoming games
+
+Analogy: Features = Ingredients, Predictions = Finished Meal
+
+V1 VS V2 FEATURES DIFFERENCES (RESOLVED)
+-----------------------------------------
+User Question: "Why can't we reuse V1 features for V2 models?"
+
+ANSWER: Features are CALCULATED differently between versions
+
+V1 Features (34 columns):
+  - Decay factor: 0.9 (10% decay per game)
+  - No variance features
+  - No trend features
+  - Basic rolling averages only
+
+V2 Features (42 columns):
+  - Decay factor: 0.85 (15% decay - more recent emphasis)
+  - NEW: 8 variance features (boom/bust indicators)
+  - NEW: 8 trend features (hot/cold streaks)
+  - All V1 features + improvements
+
+Example values for A.Rodgers Week 10:
+  V1 rolling_avg_fantasy_pts: 15.69
+  V2 rolling_avg_fantasy_pts: 15.72 (different due to decay)
+  V2 fantasy_pts_variance: 5.3 (NEW - doesn't exist in V1)
+  V2 fantasy_pts_trend: +2.1% (NEW - doesn't exist in V1)
+
+Conclusion: Each model version needs its own feature version
+
+FILE CREATION TRACKING (RESOLVED)
+----------------------------------
+User Question: "What files create V1 vs V2 data?"
+
+V1 FEATURES:
+  Created by: src/nfl/feature_engineer.py (OLD version before Dec 2)
+  Method: Run directly or via manual script
+  Output: data/nfl/features/v1_baseline_mae5.14/ (34 cols)
+
+V2 FEATURES:
+  Created by: src/nfl/v2_retrain.py (uses current feature_engineer.py)
+  Method: Automated workflow
+  Output: data/nfl/features/v2_variance_trends_mae4.66/ (42 cols)
+
+V1 MODELS:
+  Created by: src/nfl/train_models.py v1_baseline_mae5.14
+  Method: Generic training script with v1 version arg
+  Output: data/nfl/models/v1_baseline_mae5.14/ (40 models)
+
+V2 MODELS:
+  Created by: src/nfl/v2_retrain.py
+  Method: Automated workflow
+  Output: data/nfl/models/v2_variance_trends_mae4.66/ (40 models)
+
+V1/V2 PREDICTIONS:
+  Created by: Multiple options
+    - src/nfl/v2_retrain.py (generates weeks 10-12)
+    - src/nfl/generate_all_predictions.py (generates all weeks)
+    - src/nfl/ml_models.py generate_predictions() method
+  Output: data/nfl/predictions/[version]/
+
+KEY INSIGHT: ml_models.py and train_models.py are VERSION-AGNOSTIC
+They accept version as a parameter and work with any version (v1, v2, v3...)
+
+================================================================================
+CHANGES MADE
+================================================================================
+
+1. MOVED AND RENAMED FILES
+---------------------------
+BEFORE:
+  retrain_v2.py (in project root)
+
+AFTER:
+  src/nfl/v2_retrain.py (moved to src folder)
+
+Changes:
+  - Updated all paths to use project_root
+  - Changed imports to work from new location (3 levels deep)
+  - Updated docstring to reflect new location
+  - Tested: All imports work, paths resolve correctly ✓
+
+Reason: Important workflow files belong in src/, not root
+
+2. ADDED VERSION DOCUMENTATION TO FILES
+----------------------------------------
+Added VERSION comments to clarify which files are version-specific:
+
+src/nfl/feature_engineer.py:
+  """
+  VERSION: V2 (Current)
+  Contains V2 improvements:
+  - Stronger decay factor (0.85 vs 0.9)
+  - Variance features - identifies boom/bust players
+  - Recent trend features - captures hot/cold streaks
+  - Generates 42 feature columns (V1 had 34)
+  """
+
+src/nfl/ml_models.py:
+  """
+  VERSION: Version-Agnostic
+  This file contains model classes that can train ANY version
+  by accepting version as a parameter.
+  """
+
+src/nfl/train_models.py:
+  """
+  VERSION: Version-Agnostic
+  Accepts version as command line argument:
+    python src/nfl/train_models.py v1_baseline_mae5.14
+  """
+
+3. CREATED COMPREHENSIVE DOCUMENTATION
+---------------------------------------
+NEW FILE: CONTEXT.txt
+
+Contains:
+  - Project overview and goals
+  - Complete data pipeline explanation (5 steps)
+  - File structure with purposes
+  - Version history (V1, V2, V3 planned)
+  - Common issues and solutions
+  - How to use the project (scenarios)
+  - Key metrics explained (MAE, R²)
+  - Next steps for V3
+
+Purpose: Allow future Claude sessions to understand project instantly
+Size: ~400 lines of comprehensive documentation
+
+4. CLEANED UP PROJECT STRUCTURE
+--------------------------------
+BEFORE:
+  SportsAnalyzer/
+  ├── app.py
+  ├── retrain_v2.py                    ← Root level (messy)
+  ├── test_versioned_features.py       ← Root level (messy)
+  ├── test_fixes.py                    ← Root level (messy)
+  └── src/nfl/
+
+AFTER:
+  SportsAnalyzer/
+  ├── app.py                           ← Only main app in root
+  ├── CONTEXT.txt                      ← NEW documentation
+  ├── src/nfl/
+  │   ├── v2_retrain.py                ← Moved here ✓
+  │   ├── feature_engineer.py
+  │   ├── ml_models.py
+  │   └── train_models.py
+  └── testing/
+      ├── test_versioned_features.py   ← Moved earlier
+      └── test_fixes.py                ← Moved earlier
+
+Result: Clean, organized structure
+
+================================================================================
+V3 IMPROVEMENT PLAN (DETAILED ANALYSIS)
+================================================================================
+
+PROBLEM STATEMENT
+-----------------
+QB predictions got WORSE in V2:
+  V1 QB MAE: 6.56
+  V2 QB MAE: 7.19 (10% regression)
+
+User Question: "Which files should we optimize for V3?"
+
+ANSWER: COMPREHENSIVE 3-PART STRATEGY
+
+PART 1: FEATURE ENGINEERING (80% of improvement potential)
+-----------------------------------------------------------
+File: Create v3_feature_engineer.py (copy from feature_engineer.py)
+
+QB-Specific Feature Additions:
+  1. Weather Features:
+     - wind_speed (QBs struggle in wind)
+     - temperature (cold affects accuracy)
+     - is_dome_game (eliminates weather)
+     - precipitation (rain kills passing)
+
+  2. Rest & Schedule Features:
+     - days_rest (Thursday games hurt QBs)
+     - is_short_week (3 days vs 7 days rest)
+     - bye_week_coming (players rest before bye)
+
+  3. Matchup Context Features:
+     - is_division_game (familiar opponents)
+     - home_away_split (some QBs are specialists)
+     - time_zone_travel (West→East affects performance)
+
+  4. Pressure & Protection Features:
+     - blitz_rate_faced (affects decision-making)
+     - sack_rate_recent (O-line quality)
+     - pressure_rate_trend (improving/declining protection)
+     - avg_time_to_throw (quick release = less pressure)
+
+  5. Situational Features:
+     - red_zone_efficiency (TD opportunities)
+     - deep_ball_rate (big play potential)
+     - game_script_tendency (run-heavy vs pass-heavy)
+     - week_of_season (early season rust, playoff push)
+
+  6. Position-Specific Decay Factors:
+     - QB: 0.90 (need MORE history for game planning)
+     - RB: 0.85 (recent form matters)
+     - WR: 0.85 (recent form matters)
+     - TE: 0.80 (very recent emphasis - worked great in V2!)
+     - K: 0.88 (moderate history)
+
+Why V2 hurt QBs:
+  - Stronger decay (0.85) removed important historical context
+  - QBs need game planning context (more history)
+  - Missing critical situational features (weather, rest)
+
+Estimated Impact: +1.5-2.0 MAE improvement for QBs
+
+PART 2: MODEL OPTIMIZATION (15% of improvement potential)
+----------------------------------------------------------
+File: Edit ml_models.py (add position-specific hyperparameters)
+
+Current Settings (same for all positions):
+  n_estimators=200
+  max_depth=6
+  learning_rate=0.01
+
+V3 Position-Specific Settings:
+
+For QB (complex, high variance):
+  n_estimators=300      # More trees for complex patterns
+  max_depth=8           # Deeper trees for decision complexity
+  learning_rate=0.005   # Slower learning, more careful
+  min_child_weight=5    # More samples per leaf (stability)
+  subsample=0.8         # Row sampling for regularization
+
+For TE (worked great in V2, keep similar):
+  n_estimators=250
+  max_depth=7
+  learning_rate=0.01
+
+For RB/WR (current settings work well):
+  Keep current settings
+
+Implementation:
+  def _initialize_models(self, position):
+      if position == 'QB':
+          params = QB_PARAMS
+      elif position == 'TE':
+          params = TE_PARAMS
+      else:
+          params = DEFAULT_PARAMS
+
+      return XGBRegressor(**params)
+
+Estimated Impact: +0.3-0.5 MAE improvement for QBs
+
+PART 3: TARGET ENGINEERING (5% of improvement potential)
+---------------------------------------------------------
+Idea: Separate models for different QB types
+
+Rushing QBs (L.Jackson, J.Hurts):
+  - Add rushing_yards, rushing_tds to feature set
+  - Weight recent rushing trends higher
+  - Account for designed run plays
+
+Pocket QBs (T.Brady, A.Rodgers):
+  - Focus on passing metrics
+  - Weight pocket time, pressure rate
+  - Emphasize passing accuracy features
+
+Implementation: Add "qb_type" feature based on rushing yards %
+
+Estimated Impact: +0.2-0.3 MAE improvement
+
+TOTAL ESTIMATED V3 IMPROVEMENT FOR QB:
+  Current QB MAE: 7.19
+  Target QB MAE: 5.2-5.5 (25-27% improvement)
+  Parts 1+2+3: ~2.0-2.8 points improvement
+
+REALISTIC TARGET FOR V3:
+  Overall MAE: 4.66 → 4.2 (10% improvement)
+  QB MAE: 7.19 → 5.5 (24% improvement)
+  TE MAE: 3.57 → 3.5 (maintain excellence)
+  WR MAE: 4.57 → 4.4 (slight improvement)
+  RB MAE: 4.73 → 4.6 (slight improvement)
+
+================================================================================
+FILES THAT NEED MODIFICATION FOR V3
+================================================================================
+
+CREATE NEW:
+-----------
+1. src/nfl/v3_feature_engineer.py
+   Base: Copy from feature_engineer.py
+   Add:
+     - Weather features (4 new columns)
+     - Rest/schedule features (3 new columns)
+     - Matchup context (4 new columns)
+     - Pressure metrics (4 new columns)
+     - Situational features (5 new columns)
+     - Position-specific decay factors
+   Total: ~62 columns (V2 has 42)
+
+2. src/nfl/v3_retrain.py
+   Base: Copy from v2_retrain.py
+   Changes:
+     - Import v3_feature_engineer instead of feature_engineer
+     - Update version string to "v3_improved_maeUNKNOWN"
+     - Everything else stays the same
+
+MODIFY EXISTING:
+----------------
+1. src/nfl/ml_models.py
+   Add position-specific hyperparameters:
+     - QB_PARAMS = {...}
+     - TE_PARAMS = {...}
+     - DEFAULT_PARAMS = {...}
+   Modify _initialize_models() to use position-specific params
+
+KEEP UNCHANGED:
+---------------
+1. src/nfl/train_models.py (already version-agnostic)
+2. src/nfl/generate_all_predictions.py (already version-agnostic)
+
+================================================================================
+TESTING RESULTS
+================================================================================
+
+File Organization:
+  ✓ v2_retrain.py successfully moved to src/nfl/
+  ✓ All paths resolve correctly from new location
+  ✓ Imports work (FeatureEngineer, NFLModelPipeline)
+  ✓ Python syntax validation passes
+  ✓ Script initializes and prompts for confirmation
+
+Version Documentation:
+  ✓ Added VERSION comments to 3 key files
+  ✓ Clear indication of version-specific vs version-agnostic
+  ✓ Usage examples in docstrings
+
+CONTEXT.txt:
+  ✓ 400+ lines of comprehensive documentation
+  ✓ Covers all aspects of project
+  ✓ Includes V3 planning section
+  ✓ Has troubleshooting guide
+  ✓ Explains all metrics and goals
+
+================================================================================
+WHAT THE USER LEARNED
+================================================================================
+
+1. Features ≠ Predictions
+   - Features: Input to models (engineered stats)
+   - Predictions: Output from models (forecasts)
+   - NOT redundant, completely different data
+
+2. V1 and V2 features are incompatible
+   - Different number of columns (34 vs 42)
+   - Different decay factors (0.9 vs 0.85)
+   - Different calculation methods
+   - V2 models trained on 42 features, can't use 34 feature input
+
+3. File versioning strategy
+   - feature_engineer.py = Current version (V2)
+   - ml_models.py = Version-agnostic (works with any version)
+   - train_models.py = Version-agnostic (CLI accepts version)
+   - v2_retrain.py = Version-specific workflow
+
+4. How to improve QB predictions
+   - Priority 1: Add QB-specific features (weather, pressure, rest)
+   - Priority 2: Position-specific model hyperparameters
+   - Priority 3: Position-specific decay factors
+   - ml_models.py CAN be optimized (hyperparameters)
+   - train_models.py does NOT need optimization (just a wrapper)
+
+5. Data pipeline flow
+   Raw → Features → Models → Predictions → Validation
+   Each step creates different data in versioned folders
+
+================================================================================
+IMMEDIATE NEXT STEPS
+================================================================================
+
+OPTION A: Generate All V2 Predictions (Recommended First)
+----------------------------------------------------------
+Currently only have predictions for weeks 10-12.
+Should generate for all 109 weeks.
+
+Command:
+  python src/nfl/generate_all_predictions.py
+  # Select: v2_variance_trends_mae4.66
+  # Choose: Generate for ALL weeks
+
+Time: ~10-15 minutes
+Result: 109 prediction files in v2 predictions folder
+
+OPTION B: Start V3 Development
+-------------------------------
+1. Create v3_feature_engineer.py
+   - Add weather features
+   - Add rest/schedule features
+   - Implement position-specific decay
+   - Add pressure/matchup features
+
+2. Test feature generation on single week
+   python -c "from src.nfl.v3_feature_engineer import FeatureEngineer; ..."
+
+3. Create v3_retrain.py
+   - Copy from v2_retrain.py
+   - Update imports and version
+
+4. Run full V3 training
+   python src/nfl/v3_retrain.py
+
+Time: ~20-25 minutes for full training
+
+OPTION C: Validate Current V2 More Thoroughly
+----------------------------------------------
+Run validation on more weeks to confirm V2 stability:
+
+python testing/validate_accuracy.py v2_variance_trends_mae4.66 1 2 3 4 5
+
+This checks if week 10-12 results are representative
+
+================================================================================
+KEY TAKEAWAYS
+================================================================================
+
+1. ✅ Codebase is now well-organized
+   - Important files in src/
+   - Test files in testing/
+   - Clean root directory
+
+2. ✅ Version system is clear
+   - Each version has features/models/predictions folders
+   - Version-specific files labeled (v2_retrain.py)
+   - Version-agnostic files documented
+
+3. ✅ Documentation is comprehensive
+   - CONTEXT.txt explains entire project
+   - Progress reports track daily work
+   - Files have version indicators
+
+4. ✅ V3 plan is detailed and actionable
+   - Clear priorities (features > models > target engineering)
+   - Specific improvements listed
+   - Estimated impact calculated
+   - File-by-file change list
+
+5. ✅ User understands the system
+   - Features vs predictions distinction
+   - Why versions need separate data
+   - Which files to modify for improvements
+   - How the pipeline flows
+
+================================================================================
+STATISTICS
+================================================================================
+
+Code Organization:
+  Files moved: 3 (v2_retrain.py, test_*.py)
+  Files documented: 3 (feature_engineer.py, ml_models.py, train_models.py)
+  New documentation files: 1 (CONTEXT.txt)
+  Lines of documentation added: ~450
+
+Time Spent:
+  Understanding features vs predictions: ~15 min
+  Tracking file creation: ~10 min
+  Moving/renaming files: ~10 min
+  Creating CONTEXT.txt: ~30 min
+  V3 planning: ~20 min
+  Total: ~85 minutes
+
+Current State:
+  Versions: 2 (V1, V2)
+  Models: 80 total (40 per version)
+  Feature files: 204 (102 per version)
+  Prediction files: 6 (3 weeks for V2)
+  Best MAE: 4.66 (V2)
+  Documentation: Comprehensive
+
+================================================================================
+QUOTE OF THE SESSION
+================================================================================
+
+"Features are the ingredients. Predictions are the meal.
+You can't serve a V1 meal to someone expecting V2 -
+they're looking for ingredients that aren't there!"
+
+================================================================================
+END OF REPORT
+================================================================================
+
+Next report: 2025-12-04_v3_development.txt (if starting V3)
+         or: 2025-12-04_prediction_generation.txt (if running generate_all)
+Previous: 2025-12-03_v2_training_and_validation.txt

@@ -1,0 +1,373 @@
+================================================================================
+SPORTSANALYZER - PROJECT CONTEXT
+================================================================================
+Last Updated: December 3, 2025
+Version: V2 Active
+
+================================================================================
+PROJECT OVERVIEW
+================================================================================
+
+WHAT IS THIS PROJECT?
+---------------------
+NFL Fantasy Football Prediction System using Machine Learning.
+Predicts player performance (fantasy points, yards, TDs, etc.) for upcoming weeks
+to help with DFS (Daily Fantasy Sports) lineup decisions.
+
+GOAL:
+-----
+Predict NFL player fantasy performance with Mean Absolute Error (MAE) < 5.0 points.
+Current best: V2 with 4.66 MAE (professional DFS range: 4.5-5.5)
+
+CURRENT STATUS:
+---------------
+✓ V1 baseline trained (MAE: 5.14)
+✓ V2 improved trained (MAE: 4.66) - 10% better overall
+✓ 109 weeks of historical data (2020-2025 Week 13)
+✓ 40 trained models (8 per position: QB, RB, WR, TE, K)
+✓ Web API running on Flask (app.py)
+
+================================================================================
+DATA PIPELINE FLOW
+================================================================================
+
+RAW DATA → FEATURES → MODELS → PREDICTIONS → VALIDATION
+   ↓          ↓          ↓          ↓            ↓
+Step 1     Step 2     Step 3     Step 4      Step 5
+
+STEP 1: RAW DATA COLLECTION
+----------------------------
+Location: data/nfl/raw/
+Files: player_stats_YYYY_week_W.parquet
+Columns: 114 (all NFL stats from API)
+Source: NFL stats API (scraped weekly)
+
+Example:
+  player_stats_2025_week_13.parquet
+  Contains: player_name, team, position, passing_yards, rushing_yards, etc.
+
+STEP 2: FEATURE ENGINEERING
+----------------------------
+Input: Raw stats from Step 1
+Output: Engineered features (rolling averages, trends, variance)
+Location: data/nfl/features/[VERSION]/
+
+Files Created:
+  features_YYYY_week_W.parquet
+
+Example transformation:
+  Raw: P.Mahomes had 250, 300, 275 yards in last 3 games
+  Feature: rolling_avg_passing_yds = 275 (with decay weighting)
+            passing_yds_variance = 25.0 (consistency indicator)
+            passing_yds_trend = +5.2% (recent improvement)
+
+V1 Features: 34 columns, decay=0.9
+V2 Features: 42 columns, decay=0.85 (+ variance & trend features)
+
+STEP 3: MODEL TRAINING
+-----------------------
+Input: Features from Step 2
+Output: Trained ML models
+Location: data/nfl/models/[VERSION]/
+
+Models per position: 8 models
+  - fantasy_points_ppr_pob.joblib (Probability Over Baseline)
+  - fantasy_points_ppr_evob.joblib (Expected Value Over Baseline)
+  - fantasy_points_ppr_stat.joblib (Direct stat prediction)
+  - passing_yards_evob.joblib
+  - passing_yards_stat.joblib
+  - passing_tds_evob.joblib
+  - passing_tds_stat.joblib
+  - passing_interceptions_evob.joblib
+
+Total: 40 models across 5 positions (QB, RB, WR, TE, K)
+
+Model Types:
+  POB (Probability Over Baseline): Binary classification - will they beat their average?
+  EVOB (Expected Value Over Baseline): How much over/under their average?
+  STAT: Direct stat prediction (yards, TDs, etc.)
+
+STEP 4: PREDICTION GENERATION
+------------------------------
+Input: Features + Trained Models
+Output: Predictions for upcoming week
+Location: data/nfl/predictions/[VERSION]/
+
+Files Created:
+  predictions_YYYY_week_W.parquet
+
+Contains:
+  player_name, position, stat, predicted_value, confidence_lower,
+  confidence_upper, probability_over, baseline
+
+Example:
+  P.Mahomes, QB, passing_yards, 285.5, [265-305], 0.62, 275
+  (Predicting 285 yards, 62% chance to beat his 275 baseline)
+
+STEP 5: VALIDATION
+------------------
+Input: Predictions + Actual Results
+Output: Accuracy metrics (MAE, R², by position)
+Location: Testing scripts
+
+Compares predicted vs actual to calculate:
+  - MAE (Mean Absolute Error): Average points off
+  - R² (R-squared): How well predictions explain variance
+  - Position-specific accuracy
+
+================================================================================
+FILE STRUCTURE & PURPOSES
+================================================================================
+
+PROJECT ROOT FILES
+------------------
+app.py                    - Flask web API for serving predictions
+CONTEXT.txt              - This file (project overview)
+TOMORROW_START_HERE.txt  - Daily status/next steps
+
+DATA FOLDERS
+------------
+data/nfl/
+├── raw/                              # Step 1: Raw stats from API
+│   └── player_stats_*.parquet
+│
+├── features/                         # Step 2: Engineered features
+│   ├── v1_baseline_mae5.14/         (34 cols, decay=0.9)
+│   └── v2_variance_trends_mae4.66/  (42 cols, decay=0.85)
+│
+├── models/                           # Step 3: Trained ML models
+│   ├── v1_baseline_mae5.14/         (40 models)
+│   └── v2_variance_trends_mae4.66/  (40 models)
+│
+└── predictions/                      # Step 4: Model outputs
+    ├── v1_baseline_mae5.14/
+    └── v2_variance_trends_mae4.66/
+
+SOURCE CODE (src/nfl/)
+----------------------
+feature_engineer.py      - Transforms raw stats → features
+                          VERSION: V2 (current)
+                          Outputs to: data/nfl/features/[version]/
+
+ml_models.py            - Model classes (POBModel, EVOBModel, StatPredictor)
+                          VERSION: Version-Agnostic
+                          Contains: Training logic, prediction logic
+                          Outputs to: data/nfl/models/[version]/
+
+train_models.py         - Generic training script (any version)
+                          VERSION: Version-Agnostic
+                          Usage: python src/nfl/train_models.py v1_baseline_mae5.14
+                          Calls: ml_models.py
+
+v2_retrain.py           - V2-specific complete workflow
+                          VERSION: V2 only
+                          Does: Generate features → Train models → Validate
+                          Time: ~20-25 minutes
+
+generate_all_predictions.py - Generate predictions without retraining
+                               Loads models → Creates predictions for all weeks
+                               Usage: After training, to fill in missing predictions
+
+nfl_pipeline.py         - Web API pipeline (used by app.py)
+column_mappings.py      - Display name mappings for UI
+
+TESTING FOLDER
+--------------
+testing/
+├── test_versioned_features.py   - Tests feature versioning system
+├── test_fixes.py                - Tests bug fixes
+├── validate_accuracy.py         - Calculates MAE/R² metrics
+├── compare_versions.py          - V1 vs V2 comparison
+└── model_testing/
+    ├── verify_models.py         - Verifies all models load correctly
+    └── train_models_test.py     - Test training script
+
+PROGRESS REPORTS
+----------------
+progress reports/
+└── YYYY-MM-DD_*.txt    - Daily progress logs
+
+================================================================================
+HOW TO USE THIS PROJECT
+================================================================================
+
+SCENARIO 1: TRAIN A NEW VERSION (V3)
+-------------------------------------
+1. Create new feature engineer:
+   cp src/nfl/feature_engineer.py src/nfl/v3_feature_engineer.py
+   (Edit v3_feature_engineer.py to add improvements)
+
+2. Create workflow script:
+   cp src/nfl/v2_retrain.py src/nfl/v3_retrain.py
+   (Update imports to use v3_feature_engineer)
+
+3. Run training:
+   python src/nfl/v3_retrain.py
+   (Takes ~20-25 minutes)
+
+4. Result:
+   data/nfl/features/v3_*/
+   data/nfl/models/v3_*/
+   data/nfl/predictions/v3_*/
+
+SCENARIO 2: GENERATE MORE PREDICTIONS
+--------------------------------------
+You trained models but only have predictions for 3 weeks.
+Want predictions for all 109 weeks:
+
+python src/nfl/generate_all_predictions.py
+# Select version: v2_variance_trends_mae4.66
+# Choose: Generate for ALL weeks
+
+Result: 109 prediction files created
+
+SCENARIO 3: VALIDATE ACCURACY
+------------------------------
+python testing/validate_accuracy.py v2_variance_trends_mae4.66 10 11 12
+Result: MAE and R² metrics for weeks 10-12
+
+SCENARIO 4: COMPARE VERSIONS
+-----------------------------
+python testing/compare_versions.py v1_baseline_mae5.14 v2_variance_trends_mae4.66 10 11 12
+Result: Side-by-side comparison of v1 vs v2
+
+SCENARIO 5: RUN WEB API
+-----------------------
+python app.py
+# Visit: http://localhost:5000
+# Shows predictions for current week
+
+================================================================================
+VERSION HISTORY
+================================================================================
+
+V1 (Baseline - December 1, 2025)
+---------------------------------
+Features: 34 columns
+  - Rolling averages (decay=0.9)
+  - Usage trends
+  - Opponent defense ranks
+
+Results:
+  Overall MAE: 5.14
+  QB MAE: 6.56
+  RB MAE: 4.54
+  WR MAE: 4.99
+  TE MAE: 6.15
+  Overall R²: 0.181
+
+V2 (Variance & Trends - December 3, 2025)
+------------------------------------------
+Features: 42 columns
+  - Rolling averages (decay=0.85) - stronger recent emphasis
+  - Variance features (boom/bust indicator)
+  - Recent trend features (hot/cold streaks)
+  - All V1 features
+
+Results:
+  Overall MAE: 4.66 (10% improvement ✓)
+  QB MAE: 7.19 (10% regression ✗)
+  RB MAE: 4.73 (4% regression ✗)
+  WR MAE: 4.57 (8% improvement ✓)
+  TE MAE: 3.57 (42% improvement ✓✓✓)
+  Overall R²: 0.360 (99% improvement ✓✓)
+
+Status: ACTIVE - Best overall performance
+
+V3 (Planned)
+------------
+Planned Improvements:
+  - Position-specific decay factors (QB=0.90, TE=0.80)
+  - Weather features (wind, temperature, dome)
+  - Rest features (Thursday games, bye weeks)
+  - Matchup features (division games, home/away splits)
+  - Pressure features (blitz rate, sack rate)
+  - Model hyperparameter tuning per position
+
+Target: Overall MAE < 4.2 (10% improvement over V2)
+Focus: Fix QB regression (7.19 → <6.0)
+
+================================================================================
+KEY METRICS EXPLAINED
+================================================================================
+
+MAE (Mean Absolute Error)
+--------------------------
+Average points off from actual performance.
+Lower is better.
+
+Example: Predicted 18.5 points, actual 15.0 points → Error: 3.5
+         Predicted 22.0 points, actual 25.0 points → Error: 3.0
+         MAE = (3.5 + 3.0) / 2 = 3.25
+
+Professional DFS MAE Range: 4.5 - 5.5
+Our V2 MAE: 4.66 ✓ (within pro range)
+
+R² (R-squared)
+--------------
+How well predictions explain actual variance.
+Range: 0.0 (random) to 1.0 (perfect)
+
+0.0 - 0.2: Poor
+0.2 - 0.4: Fair
+0.4 - 0.6: Good
+0.6 - 0.8: Very Good
+0.8 - 1.0: Excellent
+
+Our V2 R²: 0.360 (Fair) ← Room for improvement
+
+================================================================================
+COMMON ISSUES & SOLUTIONS
+================================================================================
+
+ISSUE: "No models found"
+SOLUTION: Run python src/nfl/train_models.py [version] first
+
+ISSUE: "No features found for week X"
+SOLUTION: Run feature_engineer.engineer_all_features() to generate features
+
+ISSUE: "Predictions don't exist for week X"
+SOLUTION: Run python src/nfl/generate_all_predictions.py
+
+ISSUE: "Import error: cannot import FeatureEngineer"
+SOLUTION: Check sys.path - should include project/src/
+
+ISSUE: QB predictions are very inaccurate
+SOLUTION: This is a known V2 issue. V3 will add QB-specific features:
+          - Weather conditions
+          - Defensive pressure metrics
+          - Position-specific decay factor (0.90 for QB vs 0.85 current)
+
+================================================================================
+NEXT STEPS (V3 DEVELOPMENT)
+================================================================================
+
+1. Create v3_feature_engineer.py
+   - Add weather features
+   - Add rest/schedule features
+   - Implement position-specific decay
+   - Add pressure/matchup features
+
+2. Tune ml_models.py hyperparameters
+   - Position-specific model settings
+   - Deeper trees for QB (depth=8 vs current 6)
+   - More trees for complex positions
+
+3. Create v3_retrain.py workflow
+   - Import v3_feature_engineer
+   - Set version to v3_improved_maeUNKNOWN
+   - Run full pipeline
+
+4. Validate V3
+   - Compare to V2 (must beat 4.66 MAE)
+   - Check QB improvement (must beat 7.19 MAE)
+   - Ensure WR/TE don't regress
+
+5. Deploy best version to production API
+
+================================================================================
+END OF CONTEXT FILE
+================================================================================
+For detailed daily progress, see: progress reports/
+For current status, see: TOMORROW_START_HERE.txt
+For version comparisons, see: testing/compare_versions.py output

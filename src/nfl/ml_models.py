@@ -1,8 +1,17 @@
 """
-File: src/nfl/ml_models_fixed.py
+File: src/nfl/ml_models.py
 
-Fixed version with XGBoost compatibility
-Just rename this to ml_models.py to use
+ML model classes and training pipeline for NFL predictions.
+
+VERSION: Version-Agnostic
+This file contains model classes (POBModel, EVOBModel, StatPredictor, NFLModelPipeline)
+that can train ANY version (v1, v2, v3, etc.) by accepting version as a parameter.
+
+The version is specified when creating NFLModelPipeline:
+  pipeline = NFLModelPipeline(version="v1_baseline_mae5.14")
+  pipeline = NFLModelPipeline(version="v2_variance_trends_mae4.66")
+
+Used by: train_models.py, v2_retrain.py, generate_all_predictions.py
 """
 
 import pandas as pd
