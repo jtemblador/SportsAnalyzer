@@ -1,0 +1,105 @@
+================================================================================
+CLOSE SESSION - END OF WORK CHECKLIST
+================================================================================
+When Joe is logging off, follow this checklist to wrap up properly:
+
+================================================================================
+1. UPDATE PROJECT CONTEXT
+================================================================================
+File: project_context.txt
+Purpose: Comprehensive breakdown of the project for new conversations
+
+Update these sections if changed:
+- PROJECT OVERVIEW (current status, goals)
+- FILE STRUCTURE (new files, reorganized folders)
+- VERSION HISTORY (new model versions)
+- NEXT STEPS (what to do next session)
+
+Keep it concise but complete - this is what Claude reads first each session.
+
+================================================================================
+2. UPDATE LAST CONVERSATION CONTEXT
+================================================================================
+File: LAST_CONVO_CONTEXT.txt
+Purpose: Summary of most recent Claude conversation
+
+Include:
+- Date and model used
+- What we did (numbered list)
+- Files created/modified
+- What to do next (key action items)
+- V3 training status if running
+
+This file helps Claude pick up exactly where we left off.
+
+================================================================================
+3. UPDATE PROGRESS REPORTS
+================================================================================
+Folder: progress reports/
+
+Create new file for today if not exists:
+  progress reports/YYYY-MM-DD_session_summary.txt
+
+Include:
+- What was completed
+- Files created/modified
+- Key decisions made
+- Targets/goals for next session
+
+ALSO: Update progress reports/README.txt with:
+- Brief summary of latest updates
+- Current model status
+- Next immediate steps
+- Links to latest progress report
+
+Keep README concise - just latest news for quick reference.
+
+================================================================================
+4. COMMIT AND PUSH TO GITHUB
+================================================================================
+Commands:
+  git add .
+  git commit -m "Brief summary of what we did today"
+  git push origin master
+
+Commit message should be brief but informative:
+  "V3 training started, EPA features ready"
+  "Merged two feature branches, updated docs"
+  "Fixed QB prediction bug, added validation"
+
+DO NOT force push. DO NOT skip hooks.
+
+================================================================================
+5. VERIFY BEFORE LOGGING OFF
+================================================================================
+Checklist:
+  ☐ project_context.txt updated
+  ☐ LAST_CONVO_CONTEXT.txt updated
+  ☐ progress reports/README.txt updated
+  ☐ New progress report created if needed
+  ☐ git status shows clean working directory
+  ☐ All changes committed and pushed
+
+================================================================================
+SPECIAL CASES
+================================================================================
+
+IF LONG-RUNNING TASK (like V3 training):
+- Document in LAST_CONVO_CONTEXT.txt which computer is running it
+- When it completes, create a new progress report
+- Don't wait for it to finish to close session
+
+IF PARTIAL WORK:
+- Save state in LAST_CONVO_CONTEXT.txt (what step we're on)
+- List blockers or issues in progress report
+- Note exactly where to resume
+
+IF URGENT ISSUE:
+- Document in LAST_CONVO_CONTEXT.txt clearly marked "URGENT:"
+- Also note in project_context.txt next steps
+
+================================================================================
+END OF CHECKLIST
+================================================================================
+Follow these 5 steps + 5 verifications before logging off.
+This ensures continuity and context for next session.

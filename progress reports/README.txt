@@ -27,32 +27,48 @@ REPORTS AVAILABLE
 2025-12-02: Accuracy Validation & Versioning System
 
 ================================================================================
-CURRENT STATUS (as of 2025-12-02)
+CURRENT STATUS (as of 2025-12-04)
 ================================================================================
 
-Phase: 4 - Testing & Integration
-Deadline: Friday, December 6, 2025
+Phase: V3 Development & Training
+Current Work: V3 model training in progress (separate computer, ~3-4 hours)
 
 Models:
-- v1 baseline: MAE 5.14, trained and validated
-- v2 variance_trends: Ready to train (improvements implemented)
+- v1 baseline: MAE 5.14 (trained, archived)
+- v2 variance_trends: MAE 4.66 (active production model, 10% improvement)
+- v3 epa_efficiency: IN TRAINING (57 features, position-specific decay)
 
-Next Step:
-Run: python retrain_v2.py
+Latest Completed (2025-12-04):
+✓ Generated all V2 predictions for 2025 weeks 1-13 (18,640 total)
+✓ Created V3 feature engineering with EPA + efficiency metrics
+✓ Implemented position-specific decay (QB=0.90, RB=0.85, WR=0.85, TE=0.80, K=0.90)
+✓ Started V3 feature generation (running on separate computer)
 
-This will train improved models and compare to v1 baseline.
+Next Steps After V3 Completes:
+1. Compare V3 vs V2 accuracy by position
+2. If V3 improves overall MAE, rename folder with actual results
+3. Update models/predictions to use V3 if better
+4. Consider V4: weather, vegas lines, injury data
+
+V3 Targets:
+- Overall: 4.66 → 3.6-4.2 MAE (10-20% improvement)
+- QB: 7.19 → <6.5 (fix regression with EPA/CPOE)
+- RB: 4.73 → <4.3 (fix regression with rushing_epa)
 
 ================================================================================
 QUICK REFERENCE
 ================================================================================
 
-To see today's progress:
-- Read: 2025-12-02_accuracy_validation_and_versioning.txt
+Latest session progress:
+- Read: 2025-12-04_v3_development.txt
 
-To understand model training:
-- Read: 2025-11-30_model_training.txt
+V3 feature engineering details:
+- Read: 2025-12-04_v3_development.txt
 
-To understand validation setup:
-- Read: 2025-12-01_validation_infrastructure.txt
+V1 vs V2 comparison:
+- Read: 2025-12-04_v1_v2_player_comparison.txt
+
+V2 model training & validation:
+- Read: 2025-12-03_v2_training_and_validation.txt
 
 ================================================================================

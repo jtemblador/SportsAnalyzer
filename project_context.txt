@@ -123,8 +123,9 @@ FILE STRUCTURE & PURPOSES
 PROJECT ROOT FILES
 ------------------
 app.py                    - Flask web API for serving predictions
-CONTEXT.txt              - This file (project overview)
-TOMORROW_START_HERE.txt  - Daily status/next steps
+project_context.txt      - This file (project overview)
+LAST_CONVO_CONTEXT.txt   - Summary of most recent conversation
+CLOSE_SESSION.txt        - Wrap-up checklist for end of session
 
 DATA FOLDERS
 ------------
