@@ -1,8 +1,8 @@
 ================================================================================
 SPORTSANALYZER - PROJECT CONTEXT
 ================================================================================
-Last Updated: December 3, 2025
-Version: V2 Active
+Last Updated: December 4, 2025
+Version: V2 Active, V3 Ready to Train
 
 ================================================================================
 PROJECT OVERVIEW
@@ -63,6 +63,7 @@ Example transformation:
 
 V1 Features: 34 columns, decay=0.9
 V2 Features: 42 columns, decay=0.85 (+ variance & trend features)
+V3 Features: 57 columns, position-specific decay (+ EPA, efficiency metrics)
 
 STEP 3: MODEL TRAINING
 -----------------------
@@ -133,15 +134,18 @@ data/nfl/
 │
 ├── features/                         # Step 2: Engineered features
 │   ├── v1_baseline_mae5.14/         (34 cols, decay=0.9)
-│   └── v2_variance_trends_mae4.66/  (42 cols, decay=0.85)
+│   ├── v2_variance_trends_mae4.66/  (42 cols, decay=0.85)
+│   └── v3_epa_efficiency/           (57 cols, position-specific decay) [PENDING]
 │
 ├── models/                           # Step 3: Trained ML models
 │   ├── v1_baseline_mae5.14/         (40 models)
-│   └── v2_variance_trends_mae4.66/  (40 models)
+│   ├── v2_variance_trends_mae4.66/  (40 models)
+│   └── v3_epa_efficiency/           [PENDING]
 │
 └── predictions/                      # Step 4: Model outputs
     ├── v1_baseline_mae5.14/
-    └── v2_variance_trends_mae4.66/
+    ├── v2_variance_trends_mae4.66/  (13 weeks for 2025)
+    └── v3_epa_efficiency/           [PENDING]
 
 SOURCE CODE (src/nfl/)
 ----------------------
@@ -164,6 +168,16 @@ v2_retrain.py           - V2-specific complete workflow
                           Does: Generate features → Train models → Validate
                           Time: ~20-25 minutes
 
+v3_feature_engineer.py  - V3 feature engineering with EPA & efficiency
+                          VERSION: V3
+                          Contains: EPA, CPOE, PACR, RACR, WOPR, YAC features
+                          Position-specific decay: QB=0.90, RB=0.85, WR=0.85, TE=0.80, K=0.90
+
+v3_retrain.py           - V3-specific complete workflow
+                          VERSION: V3 only
+                          Does: Generate V3 features → Train models → Validate
+                          Time: ~3-4 hours (feature generation is slow)
+
 generate_all_predictions.py - Generate predictions without retraining
                                Loads models → Creates predictions for all weeks
                                Usage: After training, to fill in missing predictions
@@ -178,6 +192,7 @@ testing/
 ├── test_fixes.py                - Tests bug fixes
 ├── validate_accuracy.py         - Calculates MAE/R² metrics
 ├── compare_versions.py          - V1 vs V2 comparison
+├── compare_player_predictions.py - Compare individual player predictions between versions
 └── model_testing/
     ├── verify_models.py         - Verifies all models load correctly
     └── train_models_test.py     - Test training script
@@ -274,18 +289,28 @@ Results:
 
 Status: ACTIVE - Best overall performance
 
-V3 (Planned)
-------------
-Planned Improvements:
-  - Position-specific decay factors (QB=0.90, TE=0.80)
-  - Weather features (wind, temperature, dome)
-  - Rest features (Thursday games, bye weeks)
-  - Matchup features (division games, home/away splits)
-  - Pressure features (blitz rate, sack rate)
-  - Model hyperparameter tuning per position
+V3 (EPA & Efficiency - December 4, 2025) [READY TO TRAIN]
+----------------------------------------------------------
+Features: 57 columns
+  - All V2 features
+  - EPA features: passing_epa, rushing_epa, receiving_epa
+  - Efficiency metrics: CPOE, PACR, RACR, WOPR
+  - Target/Air yards share features
+  - YAC (Yards After Catch) features
+  - Kicker distance features: fg_made_40_49, fg_made_50_plus
+  - Position-specific decay factors:
+      QB: 0.90 (stable), RB: 0.85, WR: 0.85, TE: 0.80 (volatile), K: 0.90
+
+Files Created:
+  - src/nfl/v3_feature_engineer.py
+  - src/nfl/v3_retrain.py
+
+To Train: python src/nfl/v3_retrain.py
 
 Target: Overall MAE < 4.2 (10% improvement over V2)
-Focus: Fix QB regression (7.19 → <6.0)
+Focus: Fix QB regression (7.19 → <6.5), Fix RB regression (4.73 → <4.3)
+
+Status: READY TO TRAIN - Run v3_retrain.py
 
 ================================================================================
 KEY METRICS EXPLAINED
@@ -339,31 +364,23 @@ SOLUTION: This is a known V2 issue. V3 will add QB-specific features:
           - Position-specific decay factor (0.90 for QB vs 0.85 current)
 
 ================================================================================
-NEXT STEPS (V3 DEVELOPMENT)
+NEXT STEPS
 ================================================================================
 
-1. Create v3_feature_engineer.py
-   - Add weather features
-   - Add rest/schedule features
-   - Implement position-specific decay
-   - Add pressure/matchup features
+IMMEDIATE (V3 Training):
+1. ✅ Created v3_feature_engineer.py with EPA, efficiency, position decay
+2. ✅ Created v3_retrain.py workflow script
+3. ⏭️ Run: python src/nfl/v3_retrain.py (~3-4 hours)
+4. ⏭️ Validate V3 vs V2 accuracy
+5. ⏭️ Rename folder with actual MAE if improved
 
-2. Tune ml_models.py hyperparameters
-   - Position-specific model settings
-   - Deeper trees for QB (depth=8 vs current 6)
-   - More trees for complex positions
-
-3. Create v3_retrain.py workflow
-   - Import v3_feature_engineer
-   - Set version to v3_improved_maeUNKNOWN
-   - Run full pipeline
-
-4. Validate V3
-   - Compare to V2 (must beat 4.66 MAE)
-   - Check QB improvement (must beat 7.19 MAE)
-   - Ensure WR/TE don't regress
-
-5. Deploy best version to production API
+AFTER V3:
+- Build production dashboard/app with best model
+- Consider V4 improvements:
+  - Weather features (wind, temperature, dome)
+  - Vegas lines integration
+  - Injury status tracking
+  - Model hyperparameter tuning per position
 
 ================================================================================
 END OF CONTEXT FILE

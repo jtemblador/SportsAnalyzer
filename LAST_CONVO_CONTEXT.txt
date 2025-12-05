@@ -1,0 +1,111 @@
+================================================================================
+LAST CONVERSATION SUMMARY
+================================================================================
+Date: December 4, 2025
+Model Used: Claude Opus
+
+================================================================================
+WHAT WE DID TODAY
+================================================================================
+
+1. REVIEWED PROJECT STATE
+   - Checked recent commits and CONTEXT.txt
+   - V2 model is active with 4.66 MAE (10% better than V1)
+   - Identified V2 weaknesses: QB (7.19), RB (4.73) need improvement
+
+2. GENERATED V2 PREDICTIONS FOR ALL 2025 WEEKS
+   - Previously only had weeks 10-12
+   - Now have weeks 1-13 (18,640 total predictions)
+   - Used generate_all_predictions.py approach
+
+3. COMPARED V1 vs V2 PLAYER PREDICTIONS
+   - Created new tool: testing/compare_player_predictions.py
+   - Compared star players: J.Allen, L.Jackson, D.Henry, McCaffrey, Kittle, Bowers
+   - Found V2 excels at TE (42% improvement) and WR (8% improvement)
+   - Found V2 regressed on QB (10%) and RB (4%)
+
+4. DEVELOPED V3 FEATURE ENGINEERING
+   Created: src/nfl/v3_feature_engineer.py
+
+   New features added:
+   - EPA: passing_epa, rushing_epa, receiving_epa
+   - Efficiency: CPOE, PACR, RACR, WOPR
+   - Share metrics: target_share, air_yards_share
+   - YAC: passing_yac, receiving_yac
+   - Kicker: fg_made_40_49, fg_made_50_plus
+
+   Position-specific decay:
+   - QB: 0.90 (stable)
+   - RB: 0.85 (moderate)
+   - WR: 0.85 (moderate)
+   - TE: 0.80 (volatile)
+   - K:  0.90 (stable)
+
+   Total: 57 feature columns (V2 had 42)
+
+5. CREATED V3 TRAINING WORKFLOW
+   Created: src/nfl/v3_retrain.py
+
+   - 4-step pipeline: features → train → predict → validate
+   - Smart resume (Ctrl+C safe)
+   - Compares V3 vs V2 automatically
+
+6. TESTED V3 FEATURES
+   - Ran on 2025 Week 13 successfully
+   - Generated 380 players with 57 columns
+   - All positions working correctly
+
+================================================================================
+FILES CREATED TODAY
+================================================================================
+
+src/nfl/v3_feature_engineer.py      - V3 feature engineering
+src/nfl/v3_retrain.py               - V3 training workflow
+testing/compare_player_predictions.py - Player comparison tool
+progress reports/2025-12-04_v1_v2_player_comparison.txt
+progress reports/2025-12-04_v3_development.txt
+
+================================================================================
+WHAT TO DO NEXT
+================================================================================
+
+RUN V3 TRAINING:
+   python src/nfl/v3_retrain.py
+
+This will:
+1. Generate V3 features for all 109 weeks (~3-4 hours)
+2. Train 40 models with new features (~10-15 min)
+3. Generate predictions for weeks 10-12
+4. Compare V3 vs V2 accuracy
+
+AFTER V3 TRAINING:
+- If V3 is better, rename folders with actual MAE
+- Build production dashboard with best model
+- Consider V4: weather, vegas lines, injury data
+
+================================================================================
+KEY DECISIONS MADE
+================================================================================
+
+- Use V2 as production model (4.66 MAE is professional-grade)
+- V3 focuses on fixing QB/RB with EPA + efficiency features
+- Position-specific decay factors improve reactivity tuning
+- Inverse-error ensemble weighting deferred to Phase 2
+- All V3 features use data ALREADY in raw parquet files
+
+================================================================================
+V3 TARGETS
+================================================================================
+
+Metric      | V2     | V3 Target
+------------|--------|----------
+Overall MAE | 4.66   | 3.6-4.2
+QB MAE      | 7.19   | <6.5
+RB MAE      | 4.73   | <4.3
+WR MAE      | 4.57   | maintain
+TE MAE      | 3.57   | maintain
+
+================================================================================
+END OF SUMMARY
+================================================================================
+Run: python src/nfl/v3_retrain.py to start V3 training

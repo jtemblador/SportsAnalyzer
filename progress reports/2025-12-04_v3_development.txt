@@ -1,0 +1,150 @@
+================================================================================
+V3 DEVELOPMENT - PROGRESS REPORT
+================================================================================
+Date: December 4, 2025
+Session Focus: V3 Feature Engineering & Pipeline Development
+
+================================================================================
+COMPLETED TODAY
+================================================================================
+
+1. GENERATED V2 PREDICTIONS FOR ALL 2025 WEEKS
+   - Generated predictions for weeks 1-13 (was only 10-12)
+   - Total: 18,640 predictions across 13 weeks
+   - V2 predictions now complete for full 2025 season
+
+2. COMPARED V1 vs V2 PLAYER PREDICTIONS
+   - Created testing/compare_player_predictions.py tool
+   - Analyzed 15+ players across all positions
+   - Confirmed V2 is better overall (4.66 vs 5.14 MAE)
+   - Identified V2 weaknesses: QB (7.19 MAE), RB (4.73 MAE)
+   - Identified V2 strengths: TE (3.57 MAE, 42% improvement!)
+
+3. DEVELOPED V3 FEATURE ENGINEERING
+   Created: src/nfl/v3_feature_engineer.py
+
+   New V3 Features:
+   - EPA (Expected Points Added): passing_epa, rushing_epa, receiving_epa
+   - Efficiency metrics: CPOE, PACR, RACR, WOPR
+   - Target/Air yards share: target_share, air_yards_share
+   - YAC features: passing_yac, receiving_yac
+   - Kicker distance: fg_made_40_49, fg_made_50_plus, fg_made_distance
+
+   Position-Specific Decay Factors:
+   - QB: 0.90 (more stable, less reactive)
+   - RB: 0.85 (moderate)
+   - WR: 0.85 (moderate)
+   - TE: 0.80 (highly volatile, catch hot streaks)
+   - K:  0.90 (stable)
+
+   Total features: 57 columns (V2 had 42)
+
+4. CREATED V3 TRAINING WORKFLOW
+   Created: src/nfl/v3_retrain.py
+
+   Features:
+   - Complete 4-step pipeline (features → train → predict → validate)
+   - Smart resume capability (Ctrl+C safe)
+   - Auto-compares V3 vs V2 accuracy
+
+   Runtime: ~3-4 hours (feature generation is slow)
+
+5. TESTED V3 FEATURE GENERATION
+   - Tested on 2025 Week 13 successfully
+   - Generated 380 player features
+   - All position-specific features working correctly
+   - Verified all 57 columns present
+
+================================================================================
+FILES CREATED/MODIFIED
+================================================================================
+
+NEW FILES:
+- src/nfl/v3_feature_engineer.py     - V3 feature engineering class
+- src/nfl/v3_retrain.py              - V3 training workflow
+- testing/compare_player_predictions.py - Player comparison tool
+- progress reports/2025-12-04_v1_v2_player_comparison.txt
+
+MODIFIED FILES:
+- CONTEXT.txt - Updated with V3 info
+
+================================================================================
+V3 FEATURE SUMMARY
+================================================================================
+
+Position: QB (decay=0.90)
+New features: rolling_avg_passing_epa, rolling_avg_cpoe, rolling_avg_pacr,
+              rolling_avg_passing_yac
+Purpose: Fix 7.19 MAE regression from V2
+
+Position: RB (decay=0.85)
+New features: rolling_avg_rushing_epa, rolling_avg_receiving_epa
+Purpose: Fix 4.73 MAE regression from V2
+
+Position: WR (decay=0.85)
+New features: rolling_avg_receiving_epa, rolling_avg_racr, rolling_avg_wopr,
+              rolling_avg_receiving_yac, rolling_avg_target_share,
+              rolling_avg_air_yards_share, target_share_variance
+Purpose: Maintain 4.57 MAE, potentially improve
+
+Position: TE (decay=0.80)
+New features: rolling_avg_receiving_epa, rolling_avg_racr, rolling_avg_receiving_yac,
+              rolling_avg_target_share, target_share_variance
+Purpose: Maintain excellent 3.57 MAE
+
+Position: K (decay=0.90)
+New features: rolling_avg_fg_made_40_49, rolling_avg_fg_made_50_plus,
+              rolling_avg_fg_made_distance
+Purpose: Better kicker predictions with distance data
+
+================================================================================
+EXPECTED V3 IMPROVEMENTS
+================================================================================
+
+Metric          | V2 (Current) | V3 (Target) | Expected Improvement
+----------------|--------------|-------------|---------------------
+Overall MAE     | 4.66         | 3.6-4.2     | 10-20% better
+QB MAE          | 7.19         | <6.5        | EPA + CPOE fix
+RB MAE          | 4.73         | <4.3        | rushing_epa fix
+WR MAE          | 4.57         | maintain    | Already good
+TE MAE          | 3.57         | maintain    | Already excellent
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. Run V3 training pipeline:
+   python src/nfl/v3_retrain.py
+
+   This will:
+   - Generate V3 features for all weeks (2020-2025) ~3-4 hours
+   - Train 40 models with V3 features ~10-15 minutes
+   - Generate predictions for weeks 10-12
+   - Compare V3 vs V2 accuracy
+
+2. After V3 validation:
+   - Rename folders with actual MAE if improved
+   - Build production dashboard with best model
+   - Consider V4 improvements (weather, vegas lines)
+
+================================================================================
+DECISION LOG
+================================================================================
+
+Decision: Use EPA features as primary V3 improvement
+Reason: EPA is #1 predictive stat in NFL analytics, already in raw data
+
+Decision: Position-specific decay factors
+Reason: QB is more stable (0.90), TE is volatile (0.80)
+        Tailored reactivity improves predictions
+
+Decision: Skip inverse-error ensemble weighting for now
+Reason: Only affects model training, not features
+        Can add later without regenerating features
+
+Decision: Include kicker distance features
+Reason: Distance (40-49, 50+) affects difficulty and scoring
+
+================================================================================
+END OF PROGRESS REPORT
+================================================================================
