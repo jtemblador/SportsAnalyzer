@@ -1,8 +1,8 @@
 ================================================================================
 SPORTSANALYZER - PROJECT CONTEXT
 ================================================================================
-Last Updated: December 4, 2025
-Version: V2 Active, V3 Ready to Train
+Last Updated: December 5, 2025
+Version: V2 Active (Best Model), V3 Trained (No Improvement)
 
 ================================================================================
 PROJECT OVERVIEW
@@ -290,8 +290,8 @@ Results:
 
 Status: ACTIVE - Best overall performance
 
-V3 (EPA & Efficiency - December 4, 2025) [READY TO TRAIN]
-----------------------------------------------------------
+V3 (EPA & Efficiency - December 5, 2025) [TRAINED - NO IMPROVEMENT]
+-------------------------------------------------------------------
 Features: 57 columns
   - All V2 features
   - EPA features: passing_epa, rushing_epa, receiving_epa
@@ -302,16 +302,18 @@ Features: 57 columns
   - Position-specific decay factors:
       QB: 0.90 (stable), RB: 0.85, WR: 0.85, TE: 0.80 (volatile), K: 0.90
 
-Files Created:
-  - src/nfl/v3_feature_engineer.py
-  - src/nfl/v3_retrain.py
+Results:
+  Overall MAE: 4.66 (0% change - IDENTICAL to V2)
+  QB MAE: 7.26 (+1% worse than V2)
+  RB MAE: 4.75 (+0.4% worse than V2)
+  WR MAE: 4.56 (-0.2% improvement - negligible)
+  TE MAE: 3.52 (-1.4% improvement - only position with gains)
+  Overall R²: 0.358 (same as V2)
 
-To Train: python src/nfl/v3_retrain.py
-
-Target: Overall MAE < 4.2 (10% improvement over V2)
-Focus: Fix QB regression (7.19 → <6.5), Fix RB regression (4.73 → <4.3)
-
-Status: READY TO TRAIN - Run v3_retrain.py
+Status: REJECTED - No improvement despite advanced features
+Conclusion: EPA/efficiency metrics didn't help. V2's simple variance/trend
+            approach remains superior. Advanced analytics are correlated with
+            existing features or don't predict fantasy volume.
 
 ================================================================================
 KEY METRICS EXPLAINED
@@ -368,20 +370,25 @@ SOLUTION: This is a known V2 issue. V3 will add QB-specific features:
 NEXT STEPS
 ================================================================================
 
-IMMEDIATE (V3 Training):
-1. ✅ Created v3_feature_engineer.py with EPA, efficiency, position decay
-2. ✅ Created v3_retrain.py workflow script
-3. ⏭️ Run: python src/nfl/v3_retrain.py (~3-4 hours)
-4. ⏭️ Validate V3 vs V2 accuracy
-5. ⏭️ Rename folder with actual MAE if improved
+IMMEDIATE:
+1. ✅ V3 trained and validated (no improvement found)
+2. ✅ Fixed compare_versions.py path bug
+3. ✅ Removed duplicate v2_variance_trends_maeUNKNOWN folder
+4. 🔄 Continue using V2 as production model
+5. ⏭️ Clean up V3 files (optional - or keep for reference)
 
-AFTER V3:
-- Build production dashboard/app with best model
-- Consider V4 improvements:
-  - Weather features (wind, temperature, dome)
-  - Vegas lines integration
-  - Injury status tracking
-  - Model hyperparameter tuning per position
+V4 STRATEGY (Learn from V3 failure):
+Instead of more features, focus on:
+  - Game context: Vegas lines, spread, implied totals, home/away
+  - Opponent matchups: Defense vs position rankings, points allowed
+  - Volume predictors: Snap count %, red zone usage, 2-min drill targets
+  - Model architecture: Ensemble V1+V2, separate ceiling/floor models
+  - Alternative: Tune hyperparameters on V2 instead of new features
+
+PRODUCTION:
+- Deploy V2 model to production
+- Build enhanced dashboard with V2 predictions
+- Consider automated weekly retraining pipeline
 
 ================================================================================
 END OF CONTEXT FILE

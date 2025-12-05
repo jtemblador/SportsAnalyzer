@@ -27,40 +27,48 @@ REPORTS AVAILABLE
 2025-12-02: Accuracy Validation & Versioning System
 
 ================================================================================
-CURRENT STATUS (as of 2025-12-04)
+CURRENT STATUS (as of 2025-12-05)
 ================================================================================
 
-Phase: V3 Development & Training
-Current Work: V3 model training in progress (separate computer, ~3-4 hours)
+Phase: V3 Validation Complete - V2 Remains Production Model
+Current Work: V3 trained and rejected, continue with V2
 
 Models:
 - v1 baseline: MAE 5.14 (trained, archived)
-- v2 variance_trends: MAE 4.66 (active production model, 10% improvement)
-- v3 epa_efficiency: IN TRAINING (57 features, position-specific decay)
+- v2 variance_trends: MAE 4.66 (PRODUCTION MODEL - Best Performance)
+- v3 epa_efficiency: MAE 4.66 (trained, REJECTED - no improvement)
 
-Latest Completed (2025-12-04):
-✓ Generated all V2 predictions for 2025 weeks 1-13 (18,640 total)
-✓ Created V3 feature engineering with EPA + efficiency metrics
-✓ Implemented position-specific decay (QB=0.90, RB=0.85, WR=0.85, TE=0.80, K=0.90)
-✓ Started V3 feature generation (running on separate computer)
+Latest Completed (2025-12-05):
+✓ V3 training complete (3.6 hours, 102 features, 40 models)
+✓ V3 validation complete - identical to V2 (4.66 MAE)
+✓ Fixed critical bug in compare_versions.py (validate_accuracy.py path)
+✓ Removed duplicate v2_variance_trends_maeUNKNOWN folder
+✓ Comprehensive analysis: EPA/efficiency features don't improve predictions
+✓ Decision: V2 remains production model
 
-Next Steps After V3 Completes:
-1. Compare V3 vs V2 accuracy by position
-2. If V3 improves overall MAE, rename folder with actual results
-3. Update models/predictions to use V3 if better
-4. Consider V4: weather, vegas lines, injury data
+V3 Results vs V2:
+- Overall MAE: 4.66 → 4.66 (0% change)
+- QB: 7.19 → 7.26 (+1% worse)
+- RB: 4.73 → 4.75 (+0.4% worse)
+- WR: 4.57 → 4.56 (negligible)
+- TE: 3.57 → 3.52 (-1.4% better, only improvement)
 
-V3 Targets:
-- Overall: 4.66 → 3.6-4.2 MAE (10-20% improvement)
-- QB: 7.19 → <6.5 (fix regression with EPA/CPOE)
-- RB: 4.73 → <4.3 (fix regression with rushing_epa)
+Key Learning: Simple variance/trend features beat complex analytics
+
+Next Steps:
+1. Deploy V2 to production OR pursue V4
+2. V4 strategy: Game context (Vegas lines, matchups) not player features
+3. Alternative: Hyperparameter tuning on V2
 
 ================================================================================
 QUICK REFERENCE
 ================================================================================
 
 Latest session progress:
-- Read: 2025-12-04_v3_development.txt
+- Read: 2025-12-05_v3_validation.txt (V3 results & comprehensive analysis)
+
+V3 validation & why it failed:
+- Read: 2025-12-05_v3_validation.txt
 
 V3 feature engineering details:
 - Read: 2025-12-04_v3_development.txt
