@@ -26,8 +26,34 @@ def main():
     print(f"Started at: {datetime.now()}")
     print()
 
-    # Initialize pipeline
-    pipeline = NFLModelPipeline()
+    # Hard-coded version mappings (no external config needed)
+    VERSIONS = {
+        '1': 'v1_baseline_mae5.14',
+        '2': 'v2_variance_trends_mae4.66',
+        '3': 'v3_epa_efficiency',
+        '4': 'v4_position_specific'
+    }
+
+    # Ask user which version to use
+    print("Available model versions:")
+    print("1. V1 Baseline (MAE 5.14)")
+    print("2. V2 Variance & Trends (MAE 4.66)")
+    print("3. V3 EPA & Efficiency (MAE 4.66)")
+    print("4. V4 Position-Specific (MAE TBD)")
+    print()
+
+    version_choice = input("Which version to use? (1/2/3): ").strip()
+
+    if version_choice not in VERSIONS:
+        print("❌ Invalid version choice!")
+        return 1
+
+    version = VERSIONS[version_choice]
+    print(f"\n✓ Using version: {version}")
+    print()
+
+    # Initialize pipeline with selected version
+    pipeline = NFLModelPipeline(version=version)
 
     # Load existing trained models
     print("Loading trained models...")
@@ -83,47 +109,58 @@ def main():
         return 1
 
     print(f"Found {len(feature_files)} weeks with features")
+
+    # Show available weeks
+    available_weeks = []
+    for f in feature_files:
+        parts = f.stem.split('_')
+        if len(parts) >= 4:
+            season = int(parts[1])
+            week = int(parts[3])
+            available_weeks.append((season, week))
+
+    # Group by season
+    seasons = {}
+    for season, week in available_weeks:
+        if season not in seasons:
+            seasons[season] = []
+        seasons[season].append(week)
+
+    print("\nAvailable weeks by season:")
+    for season in sorted(seasons.keys()):
+        weeks = sorted(seasons[season])
+        print(f"  {season}: Weeks {min(weeks)}-{max(weeks)} ({len(weeks)} weeks)")
     print()
 
     # Ask which weeks to generate predictions for
     print("Options:")
-    print("1. Generate for ALL weeks")
-    print("2. Generate for latest week only")
-    print("3. Generate for specific range")
+    print("1. Generate for ALL weeks (all seasons)")
+    print("2. Generate for 2025 season only")
+    print("3. Generate for specific season and week range")
 
     choice = input("\nChoice (1/2/3): ").strip()
 
     weeks_to_process = []
 
     if choice == '1':
-        # All weeks
-        for f in feature_files:
-            parts = f.stem.split('_')
-            if len(parts) >= 4:
-                season = int(parts[1])
-                week = int(parts[3])
-                weeks_to_process.append((season, week))
+        # All weeks (all seasons)
+        weeks_to_process = available_weeks
 
     elif choice == '2':
-        # Latest week only
-        latest = feature_files[-1]
-        parts = latest.stem.split('_')
-        if len(parts) >= 4:
-            season = int(parts[1])
-            week = int(parts[3])
-            weeks_to_process.append((season, week))
+        # 2025 season only
+        weeks_to_process = [(s, w) for s, w in available_weeks if s == 2025]
 
     elif choice == '3':
-        # Specific range
+        # Specific season and week range
+        season = int(input("Season (e.g., 2025): "))
         start_week = int(input("Start week (e.g., 1): "))
         end_week = int(input("End week (e.g., 13): "))
-        season = int(input("Season (e.g., 2025): "))
 
-        for week in range(start_week, end_week + 1):
-            weeks_to_process.append((season, week))
+        weeks_to_process = [(s, w) for s, w in available_weeks
+                           if s == season and start_week <= w <= end_week]
 
     else:
-        print("Invalid choice")
+        print("❌ Invalid choice!")
         return 1
 
     print()

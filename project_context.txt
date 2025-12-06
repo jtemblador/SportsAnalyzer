@@ -1,8 +1,8 @@
 ================================================================================
 SPORTSANALYZER - PROJECT CONTEXT
 ================================================================================
-Last Updated: December 5, 2025
-Version: V2 Active (Best Model), V3 Trained (No Improvement)
+Last Updated: December 6, 2025
+Version: V2 Active (Best Model), V3 Rejected, V4 In Development (Phase 1 Started)
 
 ================================================================================
 PROJECT OVERVIEW
@@ -178,6 +178,34 @@ v3_retrain.py           - V3-specific complete workflow
                           VERSION: V3 only
                           Does: Generate V3 features → Train models → Validate
                           Time: ~3-4 hours (feature generation is slow)
+
+v4_espnscraper.py       - ESPN API scraper for Vegas lines (2020-2024)
+                          VERSION: V4 Phase 1
+                          Fetches: spread, total, implied totals from ESPN
+                          Caches to: data/nfl/vegas_lines/historical_lines.parquet
+
+odds_api.py             - The Odds API client for current lines (2025)
+                          VERSION: V4 Phase 1
+                          API Key: c6d41f99d9fdabfa5f5abaf8df1c9084
+                          Caches to: data/nfl/vegas_lines/current_lines_2025.parquet
+
+odds_fetcher.py         - Vegas lines orchestrator (calls both scrapers)
+                          VERSION: V4 Phase 1
+                          Usage: python src/nfl/odds_fetcher.py
+                          Combines: ESPN historical + Odds API current
+
+v4_feature_engineer.py  - V4 feature engineering (Vegas lines + V2 features)
+                          VERSION: V4 (IN PROGRESS)
+                          Currently: Copy of V2, needs Vegas integration
+
+v4_ml_models.py         - Position-specific model hyperparameters
+                          VERSION: V4 Phase 2
+                          QB: depth=9, K: depth=3, TE: depth=6
+
+v4_retrain.py           - V4-specific complete workflow
+                          VERSION: V4
+                          Does: Fetch Vegas lines → Generate features → Train → Validate
+                          Time: ~3-4 hours (including initial Vegas fetch)
 
 generate_all_predictions.py - Generate predictions without retraining
                                Loads models → Creates predictions for all weeks
@@ -374,21 +402,37 @@ IMMEDIATE:
 1. ✅ V3 trained and validated (no improvement found)
 2. ✅ Fixed compare_versions.py path bug
 3. ✅ Removed duplicate v2_variance_trends_maeUNKNOWN folder
-4. 🔄 Continue using V2 as production model
-5. ⏭️ Clean up V3 files (optional - or keep for reference)
+4. ✅ V4 Phase 1 data fetchers created (ESPN + Odds API)
+5. 🔄 Test Vegas line fetchers (run odds_fetcher.py)
+6. ⏭️ Integrate Vegas lines into v4_feature_engineer.py
+7. ⏭️ Train V4 with full Phase 1 + Phase 2 improvements
 
-V4 STRATEGY (Learn from V3 failure):
-Instead of more features, focus on:
-  - Game context: Vegas lines, spread, implied totals, home/away
-  - Opponent matchups: Defense vs position rankings, points allowed
-  - Volume predictors: Snap count %, red zone usage, 2-min drill targets
-  - Model architecture: Ensemble V1+V2, separate ceiling/floor models
-  - Alternative: Tune hyperparameters on V2 instead of new features
+V4 DEVELOPMENT (IN PROGRESS - Phase 1 Started):
+Phase 1: Game Context Features (HIGH IMPACT) - 50% COMPLETE
+  ✅ Created v4_espnscraper.py (ESPN historical 2020-2024)
+  ✅ Created odds_api.py (The Odds API for 2025 current lines)
+  ✅ Created odds_fetcher.py (orchestrator)
+  ⏭️ Test data fetching (2-3 hours for initial cache)
+  ⏭️ Integrate with v4_feature_engineer.py
+  ⏭️ Add game context features (spread, totals, home/away)
+
+Phase 2: Position-Specific Hyperparameters - COMPLETE
+  ✅ Created v4_ml_models.py
+  ✅ QB: depth=9, estimators=500 (capture complexity)
+  ✅ K: depth=3, estimators=100 (prevent overfitting)
+  ✅ TE: depth=6, estimators=300 (moderate)
+  ✅ RB/WR: depth=7, estimators=300 (standard)
+  ✅ Created v4_retrain.py workflow script
+
+Expected V4 Impact:
+  - Phase 1 alone: 0.3-0.5 MAE reduction (game context predicts volume)
+  - Phase 2 alone: 0.2-0.3 MAE reduction (QB improvement mainly)
+  - Combined: Target MAE < 4.2 (10% improvement over V2)
 
 PRODUCTION:
-- Deploy V2 model to production
-- Build enhanced dashboard with V2 predictions
-- Consider automated weekly retraining pipeline
+- Continue using V2 as production model (4.66 MAE)
+- Deploy V2 predictions to web dashboard
+- Complete V4 development before switching
 
 ================================================================================
 END OF CONTEXT FILE

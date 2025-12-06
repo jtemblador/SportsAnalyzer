@@ -1,0 +1,331 @@
+#!/usr/bin/env python3
+"""
+V4 Model Training Workflow - Position-Specific Hyperparameters
+
+This script:
+1. Uses V2 features (same as V2 - variance, trends, stronger decay)
+2. Trains models with POSITION-SPECIFIC hyperparameters (v4_ml_models.py)
+   - QB: Deeper trees (depth=9), more regularization
+   - K: Simpler models (depth=3)
+   - TE: Moderate complexity (depth=6)
+   - RB/WR: Standard settings
+3. Generates predictions for 2025 weeks
+4. Validates accuracy and compares to V2
+
+Run time: ~20-30 minutes total
+Location: src/nfl/v4_retrain.py
+"""
+
+import sys
+import subprocess
+from pathlib import Path
+from datetime import datetime
+
+# Get project root (3 levels up: src/nfl/ -> src/ -> project/)
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root / "src"))
+
+from nfl.v4_feature_engineer import FeatureEngineer
+from nfl.v4_ml_models import PositionSpecificEVOBModel as EVOBModel
+from nfl.v4_ml_models import PositionSpecificPOBModel as POBModel
+from nfl.v4_ml_models import PositionSpecificStatPredictor as StatPredictor
+
+# Import the pipeline but we'll override the model classes
+from nfl.ml_models import NFLModelPipeline
+
+
+def print_header(title):
+    """Print formatted header"""
+    print("\n" + "="*80)
+    print(f"  {title}")
+    print("="*80 + "\n")
+
+
+class V4ModelPipeline(NFLModelPipeline):
+    """
+    V4 Pipeline that uses position-specific model classes.
+    Overrides the training methods to use V4 model classes.
+    """
+
+    def train_position_models(self, position, df):
+        """Train all models for a specific position using V4 position-specific models."""
+        print(f"\n{'='*60}")
+        print(f"Training models for {position} (V4 Position-Specific)")
+        print(f"{'='*60}")
+
+        pos_df = df[df['position'] == position].copy()
+
+        if len(pos_df) < 100:
+            print(f"Insufficient data for {position} ({len(pos_df)} records)")
+            return {}
+
+        print(f"Training on {len(pos_df)} {position} records")
+
+        feature_cols = [col for col in self.position_features[position] if col in pos_df.columns]
+
+        for col in feature_cols:
+            pos_df = pos_df[pos_df[col].notna()]
+
+        pos_df = pos_df.sort_values(['season', 'week'])
+
+        train_size = int(0.7 * len(pos_df))
+        val_size = int(0.15 * len(pos_df))
+
+        train_df = pos_df.iloc[:train_size]
+        val_df = pos_df.iloc[train_size:train_size+val_size]
+        test_df = pos_df.iloc[train_size+val_size:]
+
+        position_models = {}
+
+        for stat in self.position_stats[position]:
+            target_col = f'{stat}_target'
+
+            if target_col not in train_df.columns:
+                print(f"  Skipping {stat} - no target column")
+                continue
+
+            train_clean = train_df[train_df[target_col].notna()].copy()
+            val_clean = val_df[val_df[target_col].notna()].copy()
+            test_clean = test_df[test_df[target_col].notna()].copy()
+
+            if len(train_clean) < 50:
+                print(f"  Skipping {stat} - insufficient training data")
+                continue
+
+            print(f"\n  Training {stat} models (V4 hyperparameters)...")
+
+            X_train = train_clean[feature_cols]
+            X_val = val_clean[feature_cols]
+            X_test = test_clean[feature_cols]
+
+            # Use V4 position-specific EVOB model
+            evob_model = EVOBModel(position, stat)
+
+            y_train = evob_model.prepare_target(train_clean)
+            y_val = evob_model.prepare_target(val_clean)
+            y_test = evob_model.prepare_target(test_clean)
+
+            mask_train = y_train.notna()
+            mask_val = y_val.notna()
+            mask_test = y_test.notna()
+
+            if mask_train.sum() < 50 or mask_val.sum() < 10:
+                print(f"    Insufficient non-null data for {stat}")
+                continue
+
+            evob_scores = evob_model.train(
+                X_train[mask_train], y_train[mask_train],
+                X_val[mask_val], y_val[mask_val]
+            )
+
+            if not evob_scores:
+                print(f"    Skipping {stat} - no variance in data")
+                continue
+
+            test_scores = evob_model.evaluate(X_test[mask_test], y_test[mask_test])
+            print(f"    EVOB Test - MAE: {test_scores['mae']:.2f}, R2: {test_scores['r2']:.3f}")
+
+            # Train POB model for fantasy points
+            if 'fantasy' in stat:
+                pob_model = POBModel(position, stat)
+
+                y_train_binary = pob_model.prepare_target(train_clean)
+                y_val_binary = pob_model.prepare_target(val_clean)
+                y_test_binary = pob_model.prepare_target(test_clean)
+
+                mask_train = y_train_binary.notna()
+                mask_val = y_val_binary.notna()
+                mask_test = y_test_binary.notna()
+
+                if mask_train.sum() > 50 and mask_val.sum() > 10:
+                    pob_scores = pob_model.train(
+                        X_train[mask_train], y_train_binary[mask_train],
+                        X_val[mask_val], y_val_binary[mask_val]
+                    )
+                    test_scores_pob = pob_model.evaluate(X_test[mask_test], y_test_binary[mask_test])
+
+                    print(f"    POB Test - Accuracy: {test_scores_pob['accuracy']:.3f}, F1: {test_scores_pob['f1']:.3f}")
+
+                    position_models[f'{stat}_pob'] = pob_model
+
+            # Train specialized stat predictor
+            stat_model = StatPredictor(position, stat)
+            y_train_stat = train_clean[target_col]
+            y_val_stat = val_clean[target_col]
+
+            mask_train = y_train_stat.notna()
+            mask_val = y_val_stat.notna()
+
+            if mask_train.sum() > 50 and mask_val.sum() > 10:
+                stat_scores = stat_model.train(
+                    X_train[mask_train], y_train_stat[mask_train],
+                    X_val[mask_val], y_val_stat[mask_val]
+                )
+
+            position_models[f'{stat}_evob'] = evob_model
+            position_models[f'{stat}_stat'] = stat_model
+
+        return position_models
+
+
+def main():
+    start_time = datetime.now()
+
+    print_header("V4 MODEL TRAINING WORKFLOW")
+    print("V4 Improvements (Position-Specific Hyperparameters):")
+    print("  ✓ QB: Deeper trees (depth=9), more regularization")
+    print("  ✓ K: Simpler models (depth=3, 100 estimators)")
+    print("  ✓ TE: Moderate complexity (depth=6)")
+    print("  ✓ RB/WR: Standard settings (already work well)")
+    print()
+    print("Expected improvements:")
+    print("  - QB: 7.26 → ~6.5-6.8 MAE (10-15% better)")
+    print("  - K: Better generalization (prevent overfitting)")
+    print("  - Overall: 4.66 → ~4.4-4.5 MAE (5% better)")
+    print()
+    print("This will take approximately 20-30 minutes.")
+    print("="*80)
+
+    response = input("\nProceed with V4 training? (y/n): ").strip().lower()
+    if response != 'y':
+        print("Aborted.")
+        return 0
+
+    version = "v4_position_specific"
+
+    # Step 1: Generate features (using V2 features)
+    print_header("STEP 1/4: Generating V4 Features")
+    print("Using same features as V2 (variance, trends, decay=0.85)")
+    print("V4 improvement comes from position-specific MODEL hyperparameters")
+    print("\n⚡ SMART RESUME: Already-generated weeks will be skipped automatically!")
+    print("Time: ~5-10 minutes (faster if resuming)\n")
+
+    engineer = FeatureEngineer(
+        raw_data_dir=str(project_root / 'data/nfl/raw'),
+        features_dir=str(project_root / 'data/nfl/features'),
+        version=version
+    )
+
+    try:
+        engineer.engineer_all_features(start_season=2020, end_season=2025)
+        print("\n✅ Feature generation complete!")
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Process interrupted by user (Ctrl+C)")
+        print("✓ Progress saved - already-processed weeks are preserved")
+        return 1
+    except Exception as e:
+        print(f"\n❌ Feature generation failed: {e}")
+        return 1
+
+    # Step 2: Train models with V4 position-specific hyperparameters
+    print_header("STEP 2/4: Training V4 Models (Position-Specific)")
+    print("Training with position-optimized hyperparameters...")
+    print("  - QB: depth=9, estimators=500, lr=0.005")
+    print("  - K: depth=3, estimators=100, lr=0.01")
+    print("  - TE: depth=6, estimators=300, lr=0.01")
+    print("  - RB/WR: depth=7, estimators=300, lr=0.01")
+    print("\nTime: ~15-20 minutes\n")
+
+    pipeline = V4ModelPipeline(
+        data_dir=str(project_root / 'data/nfl'),
+        model_dir=str(project_root / 'data/nfl/models'),
+        version=version
+    )
+
+    try:
+        pipeline.train_all_models()
+        print("\n✅ Model training complete!")
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Process interrupted by user (Ctrl+C)")
+        return 1
+    except Exception as e:
+        print(f"\n❌ Model training failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
+
+    # Load all trained models
+    print("\n🔄 Loading all trained V4 models for prediction...")
+    import joblib
+
+    model_files = list(pipeline.model_dir.glob("*.joblib"))
+    pipeline.models = {}
+
+    for model_file in model_files:
+        parts = model_file.stem.split('_')
+        position = parts[0]
+        model_type = parts[-1]
+
+        if position not in pipeline.models:
+            pipeline.models[position] = {}
+
+        model_name = '_'.join(parts[1:])
+
+        if model_type == 'pob':
+            stat = '_'.join(parts[1:-1])
+            model = POBModel(position, stat)
+        elif model_type == 'evob':
+            stat = '_'.join(parts[1:-1])
+            model = EVOBModel(position, stat)
+        elif model_type == 'stat':
+            stat = '_'.join(parts[1:-1])
+            model = StatPredictor(position, stat)
+        else:
+            continue
+
+        model.load_model(str(model_file))
+        pipeline.models[position][model_name] = model
+
+    print(f"✓ Loaded {len(model_files)} models for {len(pipeline.models)} positions\n")
+
+    # Step 3: Generate predictions for 2025
+    print_header("STEP 3/4: Generating 2025 Predictions")
+    print("Generating predictions for 2025 season...\n")
+
+    for week in range(1, 14):  # Weeks 1-13
+        try:
+            predictions = pipeline.generate_predictions(2025, week)
+            if predictions is not None:
+                print(f"  ✓ Week {week}: {len(predictions)} predictions")
+        except Exception as e:
+            print(f"  ⚠ Week {week}: {str(e)[:50]}")
+
+    print("\n✅ Predictions generated!")
+
+    # Step 4: Validate and compare
+    print_header("STEP 4/4: Validating Accuracy")
+    print("Comparing V2 vs V4 on Weeks 10-12...\n")
+
+    subprocess.run([
+        "python3", str(project_root / "testing/compare_versions.py"),
+        "v2_variance_trends_mae4.66",
+        version,
+        "10", "11", "12"
+    ])
+
+    # Done
+    end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds() / 60
+
+    print_header("V4 WORKFLOW COMPLETE")
+    print(f"Total time: {duration:.1f} minutes")
+    print()
+    print("📊 Review the validation results above!")
+    print()
+    print("Key metrics to check:")
+    print("  - V2 MAE: 4.66 points (current best)")
+    print("  - V4 MAE: ??? points (check output above)")
+    print("  - V2 QB MAE: 7.19 points")
+    print("  - V4 QB MAE: ??? (should be ~6.5-6.8 if improved)")
+    print()
+    print("If V4 shows improvement:")
+    print(f"  mv data/nfl/features/{version} data/nfl/features/v4_position_specific_maeX.XX")
+    print(f"  mv data/nfl/models/{version} data/nfl/models/v4_position_specific_maeX.XX")
+    print(f"  mv data/nfl/predictions/{version} data/nfl/predictions/v4_position_specific_maeX.XX")
+    print("="*80 + "\n")
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
