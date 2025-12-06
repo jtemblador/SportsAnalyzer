@@ -139,6 +139,8 @@ class ESPNVegasScraper:
             odds = competitions.get('odds', [])
 
             if not odds:
+                # DEBUG: Check if odds exist at all in response
+                # print(f"    [DEBUG] No odds for game {game_id} - {home_team} vs {away_team}")
                 return None
 
             # ESPN typically has multiple books, take the first one

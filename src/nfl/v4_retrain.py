@@ -278,30 +278,52 @@ def main():
 
     print(f"✓ Loaded {len(model_files)} models for {len(pipeline.models)} positions\n")
 
-    # Step 3: Generate predictions for 2025
-    print_header("STEP 3/4: Generating 2025 Predictions")
-    print("Generating predictions for 2025 season...\n")
+    # Step 3: Generate predictions for all available weeks
+    print_header("STEP 3/4: Generating Predictions for All 2025 Weeks")
 
-    for week in range(1, 14):  # Weeks 1-13
-        try:
-            predictions = pipeline.generate_predictions(2025, week)
-            if predictions is not None:
-                print(f"  ✓ Week {week}: {len(predictions)} predictions")
-        except Exception as e:
-            print(f"  ⚠ Week {week}: {str(e)[:50]}")
+    # Detect which weeks have raw data available
+    raw_data_dir = project_root / 'data/nfl/raw'
+    available_weeks = []
 
-    print("\n✅ Predictions generated!")
+    for week in range(1, 19):  # Check weeks 1-18
+        raw_file = raw_data_dir / f'player_stats_2025_week_{week}.parquet'
+        if raw_file.exists():
+            available_weeks.append(week)
+
+    if not available_weeks:
+        print("⚠ No 2025 raw data found. Skipping predictions.")
+    else:
+        print(f"Found raw data for {len(available_weeks)} weeks: {available_weeks}")
+        print(f"Generating predictions for weeks {min(available_weeks)}-{max(available_weeks)}...\n")
+
+        success_count = 0
+        for week in available_weeks:
+            try:
+                predictions = pipeline.generate_predictions(2025, week)
+                if predictions is not None:
+                    print(f"  ✓ Week {week}: {len(predictions)} predictions")
+                    success_count += 1
+            except Exception as e:
+                print(f"  ⚠ Week {week}: {str(e)[:50]}")
+
+        print(f"\n✅ Generated predictions for {success_count}/{len(available_weeks)} weeks!")
 
     # Step 4: Validate and compare
     print_header("STEP 4/4: Validating Accuracy")
-    print("Comparing V2 vs V4 on Weeks 10-12...\n")
 
-    subprocess.run([
-        "python3", str(project_root / "testing/compare_versions.py"),
-        "v2_variance_trends_mae4.66",
-        version,
-        "10", "11", "12"
-    ])
+    # Use the last 3 available weeks for validation (or all if less than 3)
+    validation_weeks = available_weeks[-3:] if len(available_weeks) >= 3 else available_weeks
+
+    if validation_weeks:
+        print(f"Comparing V2 vs V4 on weeks {validation_weeks}...\n")
+
+        subprocess.run([
+            "python3", str(project_root / "testing/compare_versions.py"),
+            "v2_variance_trends_mae4.66",
+            version,
+        ] + [str(w) for w in validation_weeks])
+    else:
+        print("⚠ No weeks available for validation. Skipping comparison.")
 
     # Done
     end_time = datetime.now()

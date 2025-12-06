@@ -1,0 +1,433 @@
+================================================================================
+PROGRESS REPORT: December 6, 2025
+================================================================================
+Session: Retrain Scripts Standardization + V4 Phase 1 Complete
+Model Used: Claude Sonnet 4.5
+Status: V4 Phase 1 Infrastructure Complete, All Retrain Scripts Standardized
+
+================================================================================
+SUMMARY
+================================================================================
+
+This session completed V4 Phase 1 (Vegas odds data infrastructure) and
+standardized all retrain scripts for consistency. The session was a continuation
+from the previous day's work that ran out of context.
+
+Key Achievements:
+✅ V4 Phase 1 Vegas odds infrastructure complete and tested
+✅ All 4 retrain scripts now auto-detect weeks and generate all predictions
+✅ v1_retrain.py created (didn't exist before)
+✅ Smart caching implemented for API credit preservation
+✅ File organization improved (clear naming, subdirectories)
+
+================================================================================
+MAJOR WORK COMPLETED
+================================================================================
+
+1. V4 VEGAS ODDS DATA INFRASTRUCTURE - COMPLETE
+   ✅ Renamed files: odds_api.py → v4_odds_api.py, odds_fetcher.py → v4_odds_fetcher.py
+   ✅ Fixed timezone bug in determine_nfl_week()
+   ✅ Fixed JSON serialization bug (numpy int64)
+   ✅ Fixed empty DataFrame concatenation error
+   ✅ Restructured cache: team_lines/ and player_props/ subdirectories
+   ✅ Improved file naming: {type}_week_{##}_fetched_{date}.parquet
+   ✅ Implemented smart caching: fetch only missing players (saves API credits)
+   ✅ Tested and verified: 0 API calls when data cached
+
+2. RETRAIN SCRIPTS STANDARDIZATION - COMPLETE
+   ✅ Created v1_retrain.py (didn't exist before)
+   ✅ Updated v2_retrain.py to auto-detect weeks
+   ✅ Updated v3_retrain.py to auto-detect weeks
+   ✅ Updated v4_retrain.py to auto-detect weeks
+
+   All scripts now:
+   - Auto-detect available weeks by scanning data/nfl/raw/
+   - Generate predictions for ALL found weeks (currently 1-14)
+   - Validate on last 3 weeks (instead of hardcoded 10-12)
+   - Future-proof: automatically include new weeks as data arrives
+
+3. DOCUMENTATION CREATED
+   ✅ Created RETRAIN_SCRIPTS_SUMMARY.md
+   ✅ Updated project_context.txt
+   ✅ Updated LAST_CONVO_CONTEXT.txt
+   ✅ Updated progress reports/README.txt
+   ✅ Created this progress report
+
+================================================================================
+FILES CREATED
+================================================================================
+
+RETRAIN_SCRIPTS_SUMMARY.md              - Documentation of retrain script updates
+                                           Explains auto-detection, benefits, usage
+
+src/nfl/v1_retrain.py                   - V1 baseline retrain script (NEW)
+                                           Auto-detects weeks, validates on last 3
+                                           Time: ~20-25 minutes
+
+progress reports/2025-12-06_retrain_scripts_and_v4_complete.txt
+                                        - This progress report
+
+================================================================================
+FILES MODIFIED
+================================================================================
+
+src/nfl/v4_odds_api.py                  - RENAMED from odds_api.py
+                                           FIXED: Timezone, JSON, DataFrame bugs
+                                           ADDED: Smart caching for player props
+                                           CHANGED: Cache structure and naming
+
+src/nfl/v4_odds_fetcher.py              - RENAMED from odds_fetcher.py
+                                           UPDATED: Cache paths and methods
+
+src/nfl/v2_retrain.py                   - Auto-detect weeks, generate all, validate last 3
+src/nfl/v3_retrain.py                   - Auto-detect weeks, generate all, validate last 3
+src/nfl/v4_retrain.py                   - Auto-detect weeks, generate all, validate last 3
+
+project_context.txt                     - Updated file descriptions and next steps
+LAST_CONVO_CONTEXT.txt                  - Complete session summary
+progress reports/README.txt             - Updated current status
+
+================================================================================
+KEY TECHNICAL DECISIONS
+================================================================================
+
+1. FILE NAMING CONSISTENCY
+   Decision: All V4 files use v4_* prefix
+   Reason: Easy identification of version-specific files
+   Impact: Better file organization and clarity
+
+2. CACHE ORGANIZATION
+   Decision: Subdirectories (team_lines/, player_props/) with week/date in filename
+   Reason: Clear, intuitive, easy to locate specific data
+   Example: team_lines_week_14_fetched_2025-12-06.parquet
+
+3. SMART CACHING STRATEGY
+   Decision: Cache-first approach, fetch only missing data
+   Reason: Preserve API credits (500/month limit)
+   Impact: Test showed 0 API calls when data cached
+   Workflow: Check cache → Only fetch missing → Update incrementally
+
+4. RETRAIN SCRIPT STANDARDIZATION
+   Decision: All versions use identical auto-detection pattern
+   Reason: Consistency, maintainability, future-proof
+   Impact: Created missing v1_retrain.py, updated v2/v3/v4
+
+5. ESPN SCRAPER DEPRECATED
+   Decision: Mark v4_espnscraper.py as deprecated
+   Reason: ESPN doesn't provide historical betting lines (expected limitation)
+   Impact: Use Odds API only going forward
+
+================================================================================
+BUGS FIXED
+================================================================================
+
+1. TIMEZONE MISMATCH ERROR
+   File: src/nfl/v4_odds_api.py
+   Error: TypeError: can't subtract offset-naive and offset-aware datetimes
+   Location: determine_nfl_week() method
+   Fix: Added tzinfo=timezone.utc to season_start datetime
+
+2. JSON SERIALIZATION ERROR
+   File: src/nfl/v4_odds_api.py
+   Error: TypeError: Object of type int64 is not JSON serializable
+   Location: Saving fetch_log.json
+   Fix: Convert numpy int64 to Python int: [int(w) for w in weeks]
+
+3. EMPTY DATAFRAME CONCATENATION ERROR
+   File: src/nfl/v4_odds_api.py
+   Error: ValueError: No objects to concatenate
+   Location: fetch_props_for_specific_players() when no new props found
+   Fix: Only update cache if new_props exists and is not empty
+
+4. HARDCODED PREDICTION WEEKS
+   Files: v2_retrain.py, v3_retrain.py, v4_retrain.py
+   Issue: Only generating 3 prediction files (weeks 10-12 hardcoded)
+   Fix: Implemented auto-detection to scan raw data and generate all available weeks
+
+================================================================================
+TECHNICAL ARCHITECTURE
+================================================================================
+
+V4 VEGAS ODDS WORKFLOW:
+1. Run predictions → Identify top 20-30 promising players
+2. Call fetch_props_for_specific_players(player_names, week)
+3. System checks cache first
+4. Only fetches missing players from API
+5. Updates cache incrementally
+6. Returns combined cached + new data
+7. Zero API calls if all players cached
+
+RETRAIN SCRIPTS AUTO-DETECTION PATTERN:
+```python
+raw_data_dir = project_root / 'data/nfl/raw'
+available_weeks = []
+
+for week in range(1, 19):  # Check weeks 1-18
+    raw_file = raw_data_dir / f'player_stats_2025_week_{week}.parquet'
+    if raw_file.exists():
+        available_weeks.append(week)
+
+# Generate predictions for ALL found weeks
+for week in available_weeks:
+    predictions = pipeline.generate_predictions(2025, week)
+
+# Validate on last 3 weeks
+validation_weeks = available_weeks[-3:]
+```
+
+CACHE STRUCTURE:
+```
+data/nfl/vegas_odds/
+├── team_lines/
+│   ├── team_lines_week_14_fetched_2025-12-06.parquet
+│   └── team_lines_week_15_fetched_2025-12-06.parquet
+├── player_props/
+│   └── player_props_week_14_fetched_2025-12-06.parquet
+└── fetch_log.json
+```
+
+================================================================================
+CURRENT MODEL STATUS
+================================================================================
+
+V1 Baseline:
+- MAE: 5.14
+- Status: Trained, archived
+- Features: 34 columns, decay=0.9
+
+V2 Variance & Trends:
+- MAE: 4.66
+- Status: PRODUCTION MODEL (Best Performance)
+- Features: 42 columns, decay=0.85
+- Predictions: All 14 weeks available (1-14)
+
+V3 EPA & Efficiency:
+- MAE: 4.66
+- Status: REJECTED (No improvement over V2)
+- Features: 57 columns, position-specific decay
+- Conclusion: Advanced analytics didn't help
+
+V4 Position-Specific:
+- MAE: TBD (not trained yet)
+- Status: Phase 1 ✅ Complete, Phase 2 ✅ Complete, Integration ⏭️ Next
+- Target: MAE < 4.4 (minimum) or < 4.2 (goal)
+
+================================================================================
+V4 DEVELOPMENT STATUS
+================================================================================
+
+Phase 1: Vegas Odds Data Infrastructure - ✅ COMPLETE
+  ✅ Created v4_espnscraper.py (deprecated - ESPN lacks betting data)
+  ✅ Created v4_odds_api.py (The Odds API for 2025)
+  ✅ Created v4_odds_fetcher.py (orchestrator)
+  ✅ Fixed all bugs (timezone, JSON, DataFrame)
+  ✅ Implemented smart caching
+  ✅ Restructured cache organization
+  ✅ Tested and verified working
+
+Phase 2: Position-Specific Hyperparameters - ✅ COMPLETE
+  ✅ Created v4_ml_models.py
+  ✅ QB: depth=9, estimators=500 (capture complexity)
+  ✅ K: depth=3, estimators=100 (prevent overfitting)
+  ✅ TE: depth=6, estimators=300 (moderate)
+  ✅ RB/WR: depth=7, estimators=300 (standard)
+
+Integration Phase - ⏭️ NEXT SESSION
+  ⏭️ Integrate Vegas odds into v4_feature_engineer.py
+  ⏭️ Add game context features (spread, totals, implied points)
+  ⏭️ Create position-specific volume features
+  ⏭️ Train V4 models
+  ⏭️ Validate and compare vs V2
+
+Expected Results:
+- Phase 1: 0.3-0.5 MAE reduction (game context)
+- Phase 2: 0.2 MAE reduction (position hyperparameters)
+- Combined: MAE 4.66 → 4.2-4.4 (10% improvement)
+
+================================================================================
+UNDERSTANDING: VEGAS LINES VS PLAYER PROPS
+================================================================================
+
+Vegas Lines (Team-Level):
+- Point spread (favorite/underdog)
+- Over/under (total game points)
+- Implied team totals
+- Use case: Game context for prediction models
+- Predict volume/opportunity
+
+Player Props (Player-Level):
+- Individual player lines (passing yards, rushing yards, receptions, etc.)
+- Use case: Compare model predictions vs Vegas
+- Validate prediction accuracy
+- Identify edges/opportunities
+
+Workflow:
+1. Train models with Vegas lines as features (game context)
+2. Generate predictions for upcoming week
+3. Fetch player props for top 20-30 predictions only
+4. Compare model predictions vs Vegas lines
+5. Identify where model differs from Vegas (potential edges)
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+IMMEDIATE (Next Session - HIGH PRIORITY):
+
+1. Integrate Vegas Odds into v4_feature_engineer.py:
+   - Load Vegas lines from cache (use v4_odds_fetcher.py)
+   - Add load_vegas_lines() method
+   - Add merge_with_vegas_lines() method
+   - Create game context features:
+     * team_implied_total (Vegas predicted team points)
+     * point_spread (favorite/underdog)
+     * over_under (total game points)
+     * home_away (1=home, 0=away)
+   - Create position-specific volume features:
+     * qb_game_script (expected passing volume)
+     * qb_volume_index (pass attempts predictor)
+     * rb_game_script (expected rushing volume)
+     * pass_game_total (WR/TE target volume)
+
+2. Update v4_retrain.py Workflow:
+   - Ensure Vegas data loaded before feature engineering
+   - Update expected feature count (42 V2 + ~8 new = 50 total)
+   - Test full pipeline end-to-end
+
+3. Train V4 Models:
+   - Run: python3 src/nfl/v4_retrain.py
+   - Time: ~20-30 minutes
+   - Generates V4 predictions for all 2025 weeks (1-14)
+
+4. Validate V4 Results:
+   - Run: python3 testing/compare_versions.py v2_variance_trends_mae4.66 v4_position_specific 12 13 14
+   - Target: MAE < 4.4 (5% improvement minimum)
+   - Goal: MAE < 4.2 (10% improvement ideal)
+
+5. If Successful:
+   - Rename folders to include actual MAE
+   - Update project_context.txt with V4 results
+   - Deploy V4 as new production model
+   - Document improvements and learnings
+
+BLOCKERS:
+None. All infrastructure complete and tested.
+
+================================================================================
+RETRAIN SCRIPTS SUMMARY
+================================================================================
+
+Before This Update:
+- v1_retrain.py: Didn't exist
+- v2/v3/v4: Hardcoded weeks 10-12
+- Only 3 prediction files generated
+- Manual week specification
+
+After This Update:
+- v1_retrain.py: Created (complete workflow)
+- All scripts: Auto-detect available weeks
+- Generate predictions for ALL weeks (currently 14)
+- Validate on last 3 weeks
+- Future-proof: automatically includes new weeks
+
+Benefits:
+✅ Complete data coverage (all weeks have predictions)
+✅ Future-proof (new weeks auto-included)
+✅ Consistent (all scripts work the same)
+✅ Smart validation (only recent data)
+✅ Flexible (adapts to available data)
+
+Documentation:
+See RETRAIN_SCRIPTS_SUMMARY.md for full details
+
+================================================================================
+LESSONS LEARNED
+================================================================================
+
+1. WHY V3 FAILED (EPA Features)
+   - Added player-level efficiency metrics (EPA, CPOE, etc.)
+   - Problem: Efficiency doesn't predict volume
+   - Example: Efficient player with 2 targets < Inefficient with 10 targets
+   - Result: 0% improvement over V2
+
+2. WHY V4 SHOULD WORK (Game Context)
+   - Adding game-level context features (Vegas lines)
+   - Vegas lines predict volume/opportunity
+   - Spread predicts game script (passing vs rushing)
+   - Total predicts plays/pace (more opportunities)
+   - Research shows 80%+ accuracy for totals
+
+3. SMART API USAGE
+   - Free tier: 500 requests/month
+   - Cache-first approach prevents waste
+   - Only fetch missing players (not all)
+   - Test showed: 0 API calls when cached
+   - Strategy makes 500 requests sufficient
+
+4. CONSISTENCY MATTERS
+   - All retrain scripts now follow same pattern
+   - Makes maintenance easier
+   - Reduces bugs from inconsistency
+   - Created missing v1_retrain.py for completeness
+
+================================================================================
+METRICS
+================================================================================
+
+Current Production Model (V2):
+- Overall MAE: 4.66
+- QB MAE: 7.19
+- RB MAE: 4.73
+- WR MAE: 4.57
+- TE MAE: 3.57
+- R²: 0.360
+
+V4 Targets:
+- Overall MAE: < 4.4 (5% improvement minimum)
+- Overall MAE: < 4.2 (10% improvement goal)
+- QB MAE: < 6.5 (Fix QB regression from V2)
+- Maintain or improve all other positions
+
+Why These Targets Are Achievable:
+- Phase 1 expected impact: 0.3-0.5 MAE reduction
+- Phase 2 expected impact: 0.2 MAE reduction
+- Combined: 0.5-0.7 MAE reduction possible
+- Target of 0.46 MAE reduction is conservative
+
+================================================================================
+TIME TRACKING
+================================================================================
+
+Session Duration: ~2 hours
+
+Time Breakdown:
+- V4 odds API bug fixes: 30 minutes
+- Cache restructuring: 20 minutes
+- Smart caching implementation: 30 minutes
+- Retrain scripts updates: 30 minutes
+- Documentation/commit: 10 minutes
+
+Total V4 Development Time (Phases 1+2):
+- Planning: 1 hour (previous session)
+- Implementation: 3 hours (previous session)
+- Bug fixes and testing: 2 hours (this session)
+- Total: ~6 hours
+
+Remaining Work (Integration):
+- Feature engineering: 2-3 hours (estimated)
+- Training: 30 minutes
+- Validation: 30 minutes
+- Documentation: 30 minutes
+- Total: ~4 hours (estimated)
+
+================================================================================
+END OF REPORT
+================================================================================
+Date: December 6, 2025
+Status: V4 Phase 1 Complete, Ready for Integration
+Next Session: Integrate Vegas odds into v4_feature_engineer.py
+Target: MAE 4.66 → 4.2-4.4 (10% improvement over V2)
+
+All retrain scripts standardized and documented.
+V4 data infrastructure complete and tested.
+Ready to proceed with feature integration next session.

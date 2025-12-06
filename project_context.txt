@@ -164,9 +164,18 @@ train_models.py         - Generic training script (any version)
                           Usage: python src/nfl/train_models.py v1_baseline_mae5.14
                           Calls: ml_models.py
 
+v1_retrain.py           - V1-specific complete workflow
+                          VERSION: V1 only
+                          Does: Generate V1 features → Train models → Validate
+                          Auto-detects all available weeks
+                          Validates on last 3 weeks
+                          Time: ~20-25 minutes
+
 v2_retrain.py           - V2-specific complete workflow
                           VERSION: V2 only
-                          Does: Generate features → Train models → Validate
+                          Does: Generate V2 features → Train models → Validate
+                          Auto-detects all available weeks (currently 1-14)
+                          Validates on last 3 weeks
                           Time: ~20-25 minutes
 
 v3_feature_engineer.py  - V3 feature engineering with EPA & efficiency
@@ -177,22 +186,28 @@ v3_feature_engineer.py  - V3 feature engineering with EPA & efficiency
 v3_retrain.py           - V3-specific complete workflow
                           VERSION: V3 only
                           Does: Generate V3 features → Train models → Validate
+                          Auto-detects all available weeks
+                          Validates on last 3 weeks
                           Time: ~3-4 hours (feature generation is slow)
 
 v4_espnscraper.py       - ESPN API scraper for Vegas lines (2020-2024)
                           VERSION: V4 Phase 1
-                          Fetches: spread, total, implied totals from ESPN
-                          Caches to: data/nfl/vegas_lines/historical_lines.parquet
+                          Status: DEPRECATED (ESPN doesn't have historical betting lines)
+                          Caches to: data/nfl/vegas_odds/historical/
 
-odds_api.py             - The Odds API client for current lines (2025)
-                          VERSION: V4 Phase 1
+v4_odds_api.py          - The Odds API client for betting lines (2025)
+                          VERSION: V4 Phase 1 - TESTED & WORKING
                           API Key: c6d41f99d9fdabfa5f5abaf8df1c9084
-                          Caches to: data/nfl/vegas_lines/current_lines_2025.parquet
+                          Free tier: 500 requests/month
+                          Fetches: Team lines (spread, totals) + Player props
+                          Caches to: data/nfl/vegas_odds/team_lines/
+                                     data/nfl/vegas_odds/player_props/
+                          Smart caching: Only fetches missing players
 
-odds_fetcher.py         - Vegas lines orchestrator (calls both scrapers)
-                          VERSION: V4 Phase 1
-                          Usage: python src/nfl/odds_fetcher.py
-                          Combines: ESPN historical + Odds API current
+v4_odds_fetcher.py      - Vegas lines orchestrator
+                          VERSION: V4 Phase 1 - TESTED & WORKING
+                          Usage: python src/nfl/v4_odds_fetcher.py
+                          Manages cache and coordinates data fetching
 
 v4_feature_engineer.py  - V4 feature engineering (Vegas lines + V2 features)
                           VERSION: V4 (IN PROGRESS)
@@ -204,8 +219,10 @@ v4_ml_models.py         - Position-specific model hyperparameters
 
 v4_retrain.py           - V4-specific complete workflow
                           VERSION: V4
-                          Does: Fetch Vegas lines → Generate features → Train → Validate
-                          Time: ~3-4 hours (including initial Vegas fetch)
+                          Does: Generate V4 features → Train → Validate
+                          Auto-detects all available weeks
+                          Validates on last 3 weeks
+                          Time: ~20-30 minutes
 
 generate_all_predictions.py - Generate predictions without retraining
                                Loads models → Creates predictions for all weeks
@@ -402,19 +419,22 @@ IMMEDIATE:
 1. ✅ V3 trained and validated (no improvement found)
 2. ✅ Fixed compare_versions.py path bug
 3. ✅ Removed duplicate v2_variance_trends_maeUNKNOWN folder
-4. ✅ V4 Phase 1 data fetchers created (ESPN + Odds API)
-5. 🔄 Test Vegas line fetchers (run odds_fetcher.py)
-6. ⏭️ Integrate Vegas lines into v4_feature_engineer.py
+4. ✅ V4 Phase 1 data fetchers created and tested
+5. ✅ All retrain scripts updated to auto-detect weeks
+6. ⏭️ NEXT SESSION: Integrate Vegas odds into v4_feature_engineer.py
 7. ⏭️ Train V4 with full Phase 1 + Phase 2 improvements
 
-V4 DEVELOPMENT (IN PROGRESS - Phase 1 Started):
-Phase 1: Game Context Features (HIGH IMPACT) - 50% COMPLETE
-  ✅ Created v4_espnscraper.py (ESPN historical 2020-2024)
-  ✅ Created odds_api.py (The Odds API for 2025 current lines)
-  ✅ Created odds_fetcher.py (orchestrator)
-  ⏭️ Test data fetching (2-3 hours for initial cache)
-  ⏭️ Integrate with v4_feature_engineer.py
-  ⏭️ Add game context features (spread, totals, home/away)
+V4 DEVELOPMENT (IN PROGRESS - Phase 1 Complete):
+Phase 1: Vegas Odds Data Infrastructure (HIGH IMPACT) - ✅ COMPLETE
+  ✅ Created v4_espnscraper.py (deprecated - ESPN lacks historical betting data)
+  ✅ Created v4_odds_api.py (The Odds API for 2025)
+  ✅ Created v4_odds_fetcher.py (orchestrator)
+  ✅ Fixed timezone and caching bugs
+  ✅ Implemented smart caching (cache-first, saves API credits)
+  ✅ Restructured cache: team_lines/ and player_props/ subdirectories
+  ✅ Tested and working (0 API calls when cached)
+  ⏭️ NEXT: Integrate with v4_feature_engineer.py
+  ⏭️ Add game context features (spread, totals, implied points)
 
 Phase 2: Position-Specific Hyperparameters - COMPLETE
   ✅ Created v4_ml_models.py
