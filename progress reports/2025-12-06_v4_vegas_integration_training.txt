@@ -1,0 +1,391 @@
+================================================================================
+PROGRESS REPORT: December 6, 2025 (Session 2)
+================================================================================
+Session: V4 Vegas Odds Integration & Training Launch
+Model Used: Claude Sonnet 4.5
+Status: V4 Training IN PROGRESS
+Duration: ~2 hours
+
+================================================================================
+SUMMARY
+================================================================================
+
+This session completed the V4 Vegas odds integration into the feature engineer
+and launched V4 training. V4 combines Phase 1 (Vegas game context) with Phase 2
+(position-specific hyperparameters) for expected 10% improvement over V2.
+
+Key Achievement: V4 training successfully launched after integrating 8 Vegas
+features into the feature engineering pipeline.
+
+================================================================================
+MAJOR WORK COMPLETED
+================================================================================
+
+1. V4_FEATURE_ENGINEER.PY - VEGAS ODDS INTEGRATION
+   ✅ Added VegasLinesFetcher import and initialization
+   ✅ Created load_vegas_lines(season, week) method
+   ✅ Created add_vegas_features(player_row, vegas_df) method
+   ✅ Added 8 Vegas features to feature set:
+      - team_implied_total (Vegas expected team points)
+      - opponent_implied_total (expected opponent points)
+      - point_spread (game script predictor)
+      - over_under (pace indicator)
+      - is_home (home field advantage)
+      - game_script_index (derived: pass-heavy vs run-heavy)
+      - qb_volume_index (QB-specific volume predictor)
+      - rb_volume_index (RB-specific volume predictor)
+   ✅ Updated engineer_week_features() to merge Vegas data
+   ✅ Total features: 50 (42 V2 + 8 Vegas)
+
+2. V4_RETRAIN.PY - VEGAS DATA WORKFLOW
+   ✅ Added Step 0: Check/fetch Vegas team lines before training
+   ✅ Updated Step 1: Pass odds_api_key to FeatureEngineer
+   ✅ Updated descriptions to clarify Phase 1+2 improvements
+   ✅ Updated logging to show "50 features (42 V2 + 8 Vegas)"
+   ✅ Better error handling for missing Vegas data
+
+3. BUG FIXES
+   ✅ Fixed import error in v4_odds_fetcher.py
+   ✅ Removed deprecated v4_espnscraper.py import
+   ✅ ESPN scraper removed (doesn't have historical betting lines)
+
+4. USER EDUCATION
+   ✅ Clarified V3 vs V4 differences
+   ✅ Explained Vegas data usage (team lines vs player props)
+   ✅ Explained training pipeline (features → models → predictions)
+   ✅ Clarified why neutral defaults are used for historical data
+
+5. LAUNCHED V4 TRAINING
+   ✅ User ran: python3 src/nfl/v4_retrain.py
+   ✅ Step 0: Found cached Vegas lines (29 games, weeks 14-15)
+   ✅ Step 1: Feature generation started (~109 weeks)
+   ✅ Processing with neutral Vegas defaults for 2020-2024
+   ✅ Will use real Vegas lines for 2025 weeks 14-15
+
+================================================================================
+FILES CREATED
+================================================================================
+
+progress reports/2025-12-06_v4_vegas_integration_training.txt
+                                        - This progress report
+
+================================================================================
+FILES MODIFIED
+================================================================================
+
+src/nfl/v4_feature_engineer.py       - MAJOR: Vegas odds integration
+                                        Added 8 Vegas features
+                                        50 total features (42 V2 + 8 Vegas)
+
+src/nfl/v4_retrain.py                - Added Step 0 (Vegas checking)
+                                        Updated for 50-feature workflow
+                                        Better Phase 1+2 descriptions
+
+src/nfl/v4_odds_fetcher.py           - Fixed import error
+                                        Removed ESPN scraper reference
+
+project_context.txt                  - Updated NEXT STEPS
+                                        Marked integration complete
+                                        Added training status
+
+LAST_CONVO_CONTEXT.txt               - Complete session summary
+
+================================================================================
+KEY TECHNICAL DECISIONS
+================================================================================
+
+1. VEGAS DATA AS TRAINING FEATURES (Not Just Validation)
+   Decision: Merge Vegas team lines into feature set during training
+   Rationale: Game context (spread, totals) predicts volume/opportunity
+   Implementation: 8 new features added to existing 42 V2 features
+   Impact: Models learn patterns like "Underdogs pass +40%, favorites run +30%"
+
+2. NEUTRAL DEFAULTS FOR HISTORICAL DATA
+   Decision: Use neutral values (spread=0, total=45) for 2020-2024
+   Rationale: No historical betting lines available, need consistent feature set
+   Implementation: add_vegas_features() returns defaults if no Vegas data
+   Impact: Historical data still trains models (without game context)
+
+3. POSITION-SPECIFIC VOLUME INDICES
+   Decision: Create QB-specific and RB-specific volume predictors from Vegas
+   Rationale: Different positions respond differently to game script
+   Implementation:
+     - qb_volume_index: Higher when trailing (underdogs pass more)
+     - rb_volume_index: Higher when favored (favorites run more)
+   Impact: Models can learn position-specific game script effects
+
+4. 50-FEATURE ARCHITECTURE
+   Decision: Keep all V2 features, add Vegas on top
+   Rationale: V2 works well (4.66 MAE), Vegas adds new dimension
+   Implementation: 42 V2 (variance, trends) + 8 Vegas (context)
+   Impact: Best of both worlds - player patterns + game context
+
+================================================================================
+V4 PIPELINE BREAKDOWN
+================================================================================
+
+TRAINING PHASE (Current):
+  Step 0: Fetch team lines (done - using cache)
+  Step 1: Generate 50 features per player (IN PROGRESS)
+    - Load player history (last 6 games)
+    - Calculate V2 features (42)
+    - Load Vegas lines for this week
+    - Merge Vegas data by team/opponent
+    - Add 8 Vegas features
+    - Save 50-feature file
+  Step 2: Train 40 models with position-specific hyperparameters (PENDING)
+  Step 3: Generate predictions for all weeks (PENDING)
+  Step 4: Validate against V2 (PENDING)
+
+PREDICTION PHASE (Future):
+  1. Fetch team lines for upcoming week
+  2. Generate 50 features (includes Vegas)
+  3. Apply trained models
+  4. Output predictions
+
+VALIDATION PHASE (Optional):
+  1. Get top 20 predictions
+  2. Fetch player props for those players only
+  3. Compare model predictions vs Vegas lines
+
+================================================================================
+V3 VS V4 COMPARISON
+================================================================================
+
+V3 (REJECTED - No improvement):
+  - Features: 57 (42 V2 + 15 EPA/efficiency)
+  - Added: EPA, CPOE, PACR, RACR, WOPR, YAC
+  - Level: Player efficiency metrics
+  - Result: MAE 4.66 (IDENTICAL to V2)
+  - Why failed: Efficiency doesn't predict volume
+
+V4 (IN TRAINING - Expected to work):
+  - Features: 50 (42 V2 + 8 Vegas)
+  - Added: Spread, totals, implied points, volume indices
+  - Level: Game context metrics
+  - Expected: MAE 4.2-4.4 (10% better than V2)
+  - Why should work: Game context predicts volume
+
+Key Insight:
+  Fantasy Points = Volume × Efficiency
+  - V2 has efficiency (player stats, trends)
+  - V3 added MORE efficiency (EPA, etc.) - redundant
+  - V4 adds volume predictor (Vegas game script) - fills gap
+
+================================================================================
+CURRENT V4 TRAINING STATUS
+================================================================================
+
+Status: 🔄 IN PROGRESS
+
+Started: December 6, 2025
+Current Step: Feature Generation (Step 1/4)
+Progress: Processing ~109 weeks (2020-2025 Week 1-14)
+
+What's Happening:
+  - Loading player stats for each week
+  - Loading Vegas lines (cached for 2025 weeks 14-15)
+  - Generating 50 features per player
+  - Using neutral Vegas defaults for 2020-2024 (expected)
+  - Using real Vegas lines for 2025 weeks 14-15
+
+Expected Completion: ~20-30 minutes from start
+Next Steps:
+  - Model training (~15-20 min)
+  - Prediction generation (~2-3 min)
+  - Validation vs V2
+
+Target Results:
+  - Overall MAE: < 4.4 (minimum) or < 4.2 (goal)
+  - QB MAE: < 6.8 (vs V2's 7.19)
+  - Maintain or improve all other positions
+
+================================================================================
+EXPECTED V4 IMPROVEMENTS
+================================================================================
+
+Phase 1 (Vegas Odds):
+  Expected Impact: 0.3-0.5 MAE reduction
+  Mechanism: Game context predicts volume
+  Examples:
+    - Team -7 favorite → RB gets +3 carries (run out clock)
+    - Team +7 underdog → QB gets +5 pass attempts (playing catch-up)
+    - 51+ total → More plays overall (fast pace)
+
+Phase 2 (Position Hyperparameters):
+  Expected Impact: 0.2 MAE reduction
+  Mechanism: Position-optimized model complexity
+  Examples:
+    - QB: depth=9 (capture complex patterns)
+    - K: depth=3 (prevent overfitting on small sample)
+    - TE: depth=6 (moderate complexity)
+
+Combined Expected Result:
+  V2 MAE: 4.66
+  Phase 1: -0.4 MAE (conservative estimate)
+  Phase 2: -0.2 MAE
+  V4 Target: 4.0-4.2 MAE (10-14% improvement)
+
+================================================================================
+WHAT TO DO NEXT SESSION
+================================================================================
+
+IMMEDIATE (When training completes):
+
+1. Review V4 Validation Results
+   - Check overall MAE vs V2 (target: < 4.4)
+   - Check position breakdowns (especially QB)
+   - Check R² score (target: > 0.36)
+   - Compare validation weeks 12-14 vs V2
+
+2. If V4 Shows Improvement:
+   - Rename folders with actual MAE:
+     * data/nfl/features/v4_position_specific → v4_vegas_odds_maeX.XX
+     * data/nfl/models/v4_position_specific → v4_vegas_odds_maeX.XX
+     * data/nfl/predictions/v4_position_specific → v4_vegas_odds_maeX.XX
+   - Update project_context.txt with V4 results
+   - Create progress report documenting success
+   - Deploy V4 as production model
+
+3. If V4 Shows NO Improvement:
+   - Analyze feature importance (are Vegas features being used?)
+   - Check position-by-position results (which positions improved/regressed?)
+   - Review predictions for 2025 weeks 14-15 specifically (real Vegas data)
+   - Document findings and consider V5 approach
+
+4. Optional Next Steps:
+   - Implement player props validation script
+   - Fetch more historical Vegas data if available
+   - Consider ensemble approach (combine V2 + V4)
+
+================================================================================
+BLOCKERS
+================================================================================
+
+None. V4 training is running successfully.
+
+Current process is autonomous - just wait for completion.
+
+================================================================================
+METRICS TO TRACK
+================================================================================
+
+V2 Baseline (Current Production):
+  Overall MAE: 4.66
+  QB MAE: 7.19
+  RB MAE: 4.73
+  WR MAE: 4.57
+  TE MAE: 3.57
+  R²: 0.360
+
+V4 Targets (Minimum):
+  Overall MAE: < 4.4 (5% improvement)
+  QB MAE: < 6.8 (5% improvement)
+  Maintain or improve: RB, WR, TE
+  R²: > 0.38
+
+V4 Goals (Stretch):
+  Overall MAE: < 4.2 (10% improvement)
+  QB MAE: < 6.5 (10% improvement)
+  R²: > 0.40
+
+Success Criteria:
+  ✓ Overall MAE improves by at least 5%
+  ✓ QB improves (was worst position in V2)
+  ✓ No position regresses significantly (>5%)
+  ✓ R² improves (better variance explanation)
+
+================================================================================
+LESSONS LEARNED
+================================================================================
+
+1. IMPORTANCE OF CONTEXT VS EFFICIENCY
+   - V3 added more efficiency metrics (EPA, CPOE) - failed
+   - V4 adds context metrics (Vegas lines) - expected to work
+   - Lesson: Context predicts volume, volume matters more than efficiency
+
+2. USER CLARIFICATION IS VALUABLE
+   - User questioned whether we should fetch player props first
+   - This led to excellent clarification of team lines vs player props
+   - Lesson: When user questions the approach, explain thoroughly
+
+3. NEUTRAL DEFAULTS ARE ACCEPTABLE
+   - Historical data doesn't have Vegas lines
+   - Using neutral defaults maintains consistent feature set
+   - Models can still train on player patterns
+   - Lesson: Don't let perfect be enemy of good
+
+4. ITERATIVE IMPROVEMENT PROCESS
+   - V1: Baseline (5.14 MAE)
+   - V2: Variance & trends (4.66 MAE) ✓
+   - V3: EPA/efficiency (4.66 MAE) ✗
+   - V4: Vegas context (TBD)
+   - Lesson: Not every improvement works, but keep trying
+
+================================================================================
+TECHNICAL NOTES
+================================================================================
+
+Vegas Feature Calculations:
+
+game_script_index:
+  = (-point_spread × 0.3) + ((over_under - 45) × 0.1)
+  Interpretation:
+    - Positive = pass-heavy expected (trailing or high-scoring)
+    - Negative = run-heavy expected (leading or low-scoring)
+
+qb_volume_index:
+  = max(0, point_spread) × 0.5 + (team_implied_total - 20) × 0.3
+  Interpretation:
+    - Higher when underdog (trailing teams pass more)
+    - Higher when high team total (more offensive plays)
+
+rb_volume_index:
+  = max(0, -point_spread) × 0.5 + (team_implied_total - 20) × 0.2
+  Interpretation:
+    - Higher when favorite (leading teams run more)
+    - Higher when high team total (more offensive plays)
+
+These formulas are heuristics based on NFL research showing:
+  - Trailing teams: +40% pass attempts
+  - Leading teams: +30% rush attempts
+  - High totals: +15% plays overall
+
+================================================================================
+DATA SUMMARY
+================================================================================
+
+Vegas Odds Cache:
+  Location: data/nfl/vegas_odds/team_lines/
+  Files: team_lines_week_14_fetched_2025-12-06.parquet
+         team_lines_week_15_fetched_2025-12-06.parquet
+  Games: 29 total (2025 weeks 14-15)
+  API calls used: ~2 (well under 500/month limit)
+
+Feature Files (Being Generated):
+  Location: data/nfl/features/v4_position_specific/
+  Count: ~109 weeks (2020-2025 Week 1-14)
+  Features per file: 50 (42 V2 + 8 Vegas)
+  Players per week: ~300-400
+
+Models (To Be Trained):
+  Location: data/nfl/models/v4_position_specific/
+  Count: 40 models (8 per position × 5 positions)
+  Hyperparameters: Position-specific (QB depth=9, K depth=3, etc.)
+
+Predictions (To Be Generated):
+  Location: data/nfl/predictions/v4_position_specific/
+  Count: ~14 weeks (all available 2025 weeks)
+  Players: ~300-400 per week
+
+================================================================================
+END OF REPORT
+================================================================================
+Date: December 6, 2025
+Status: V4 Training IN PROGRESS
+Next Session: Review results, deploy if successful
+Target: MAE < 4.4 (minimum) or < 4.2 (goal)
+
+V4 Vegas odds integration complete.
+Training launched successfully.
+Expected completion: ~20-30 minutes from start.

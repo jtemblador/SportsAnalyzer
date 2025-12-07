@@ -1,17 +1,24 @@
 """
 File: src/nfl/v4_feature_engineer.py
 
-FeatureEngineer class for V4 - same as V2 features for now.
-V4 improvement comes from position-specific model hyperparameters in v4_ml_models.py
+FeatureEngineer class for V4 - V2 features + Vegas odds game context.
 
 VERSION: V4
-Same features as V2:
+Features from V2 (42):
 - Stronger decay factor (0.85 vs 0.9) - emphasizes recent 3 games
 - Variance features - identifies boom/bust players
 - Recent trend features - captures hot/cold streaks
-- Generates 42 feature columns
 
-Future: Add game context features (Vegas lines, home/away) when API is available.
+NEW in V4 (8 Vegas features):
+- team_implied_total - Vegas expected team points (volume predictor)
+- opponent_implied_total - Expected opponent points
+- point_spread - Team spread (game script predictor)
+- over_under - Total game points (pace indicator)
+- is_home - Home field advantage
+- game_script_index - Derived metric (pass-heavy vs run-heavy)
+- position_volume_index - Position-specific volume predictor
+
+Generates 50 feature columns total (42 V2 + 8 Vegas)
 
 Used by: v4_retrain.py
 """
@@ -20,6 +27,11 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from datetime import datetime
+import sys
+
+# Import Vegas odds fetcher
+sys.path.insert(0, str(Path(__file__).parent))
+from v4_odds_fetcher import VegasLinesFetcher
 
 
 class FeatureEngineer:
@@ -28,7 +40,7 @@ class FeatureEngineer:
     Handles rolling averages, opponent adjustments, usage trends, and context.
     """
 
-    def __init__(self, raw_data_dir='./data/nfl/raw', features_dir='./data/nfl/features', version='v1_baseline_mae5.14'):
+    def __init__(self, raw_data_dir='./data/nfl/raw', features_dir='./data/nfl/features', version='v1_baseline_mae5.14', odds_api_key=None):
         """
         Initialize the FeatureEngineer.
 
@@ -36,6 +48,7 @@ class FeatureEngineer:
             raw_data_dir: Directory containing raw parquet files
             features_dir: Base directory for features (will create versioned subdirectory)
             version: Feature version identifier (e.g., 'v1_baseline_mae5.14', 'v2_variance_trends')
+            odds_api_key: API key for The Odds API (optional, for V4 Vegas features)
         """
         self.raw_data_dir = raw_data_dir
         self.features_base_dir = features_dir
@@ -45,10 +58,21 @@ class FeatureEngineer:
         self.cleaned_data_dir = str(Path(features_dir) / version)
         Path(self.cleaned_data_dir).mkdir(parents=True, exist_ok=True)
 
+        # V4: Initialize Vegas odds fetcher if API key provided
+        self.vegas_fetcher = None
+        if odds_api_key:
+            cache_dir = str(Path(raw_data_dir).parent / 'vegas_odds')
+            self.vegas_fetcher = VegasLinesFetcher(
+                cache_dir=cache_dir,
+                odds_api_key=odds_api_key
+            )
+
         print("✓ FeatureEngineer initialized")
         print(f"  Version: {version}")
         print(f"  Raw data: {self.raw_data_dir}")
         print(f"  Feature output: {self.cleaned_data_dir}")
+        if self.vegas_fetcher:
+            print(f"  Vegas odds: ENABLED (V4 feature set)")
     
     # ===== UTILITY METHODS =====
     
@@ -194,25 +218,138 @@ class FeatureEngineer:
     def calculate_usage_trend(self, player_history, stat_name):
         """
         Calculate percentage change in usage over recent games.
-        
+
         Args:
             player_history: DataFrame with player history
             stat_name: Stat to track (attempts, targets, carries)
-        
+
         Returns:
             Percentage change
         """
         if len(player_history) < 3 or stat_name not in player_history.columns:
             return 0.0
-        
+
         recent_3 = player_history.head(3)[stat_name].mean()
         older_3 = player_history.tail(3)[stat_name].mean()
-        
+
         if older_3 == 0:
             return 0.0
-        
+
         return ((recent_3 - older_3) / older_3) * 100
-    
+
+    # ===== V4 VEGAS ODDS METHODS =====
+
+    def load_vegas_lines(self, season, week):
+        """
+        Load Vegas lines for a specific week.
+
+        Args:
+            season: Season year
+            week: Week number
+
+        Returns:
+            DataFrame with Vegas lines, or None if not available
+        """
+        if not self.vegas_fetcher:
+            return None
+
+        try:
+            # Load cached team lines for this week
+            vegas_df = self.vegas_fetcher.load_cached_team_lines(week=week)
+
+            if vegas_df.empty:
+                print(f"    ⚠ No Vegas lines cached for {season} Week {week}")
+                return None
+
+            # Filter to correct season
+            vegas_df = vegas_df[vegas_df['season'] == season]
+
+            if vegas_df.empty:
+                print(f"    ⚠ No Vegas lines for {season} Week {week}")
+                return None
+
+            return vegas_df
+
+        except Exception as e:
+            print(f"    ⚠ Error loading Vegas lines: {str(e)[:50]}")
+            return None
+
+    def add_vegas_features(self, player_row, vegas_df):
+        """
+        Add Vegas odds features for a player based on their game.
+
+        Args:
+            player_row: Row with player data (must have 'team' and 'opponent_team')
+            vegas_df: DataFrame with Vegas lines for this week
+
+        Returns:
+            Dictionary with 8 Vegas features
+        """
+        vegas_features = {
+            'team_implied_total': 22.5,  # Neutral defaults if no data
+            'opponent_implied_total': 22.5,
+            'point_spread': 0.0,
+            'over_under': 45.0,
+            'is_home': 0,
+            'game_script_index': 0.0,
+            'qb_volume_index': 0.0,
+            'rb_volume_index': 0.0
+        }
+
+        if vegas_df is None or vegas_df.empty:
+            return vegas_features
+
+        team = player_row['team']
+        opponent = player_row['opponent_team']
+
+        # Find this team's game in Vegas data
+        game = vegas_df[
+            ((vegas_df['home_team'] == team) & (vegas_df['away_team'] == opponent)) |
+            ((vegas_df['away_team'] == team) & (vegas_df['home_team'] == opponent))
+        ]
+
+        if game.empty:
+            return vegas_features
+
+        game_row = game.iloc[0]
+        is_home = game_row['home_team'] == team
+
+        # Extract Vegas features
+        vegas_features['is_home'] = 1 if is_home else 0
+        vegas_features['over_under'] = game_row['over_under']
+
+        if is_home:
+            vegas_features['team_implied_total'] = game_row['home_implied_total']
+            vegas_features['opponent_implied_total'] = game_row['away_implied_total']
+            vegas_features['point_spread'] = game_row['spread']  # Negative = favorite
+        else:
+            vegas_features['team_implied_total'] = game_row['away_implied_total']
+            vegas_features['opponent_implied_total'] = game_row['home_implied_total']
+            vegas_features['point_spread'] = -game_row['spread']  # Flip spread for away team
+
+        # Derived features
+        # Game script index: Positive = pass-heavy expected (trailing/high-scoring)
+        # Negative spread (favorite) + high total = still pass-heavy (shootout)
+        vegas_features['game_script_index'] = (
+            (-vegas_features['point_spread'] * 0.3) +  # Being underdog increases passing
+            (vegas_features['over_under'] - 45) * 0.1   # High totals = more plays
+        )
+
+        # Position-specific volume indices
+        # QB: Higher when trailing or in high-scoring games
+        vegas_features['qb_volume_index'] = (
+            max(0, vegas_features['point_spread']) * 0.5 +  # Underdogs pass more
+            (vegas_features['team_implied_total'] - 20) * 0.3  # High team total = more volume
+        )
+
+        # RB: Higher when favored (winning teams run more)
+        vegas_features['rb_volume_index'] = (
+            max(0, -vegas_features['point_spread']) * 0.5 +  # Favorites run more
+            (vegas_features['team_implied_total'] - 20) * 0.2
+        )
+
+        return vegas_features
+
     # ===== POSITION-SPECIFIC FEATURE BUILDERS =====
     
     def engineer_qb_features(self, player_row, player_history, season, week):
@@ -455,36 +592,43 @@ class FeatureEngineer:
     def engineer_week_features(self, season, week):
         """
         Process one week - calculate features for all players.
-        
+
         Args:
             season: Season year
             week: Week number
-        
+
         Returns:
             DataFrame with engineered features, or None if failed
         """
         filepath = f"{self.raw_data_dir}/player_stats_{season}_week_{week}.parquet"
-        
+
         if not Path(filepath).exists():
             return None
-        
+
         # Load raw data for this week
         raw_df = pd.read_parquet(filepath)
-        
+
+        # V4: Load Vegas lines for this week
+        vegas_df = self.load_vegas_lines(season, week)
+        if vegas_df is not None:
+            print(f"  ✓ Loaded Vegas lines for {len(vegas_df)} games")
+        else:
+            print(f"  ⚠ No Vegas lines available - using neutral defaults")
+
         all_features = []
-        
+
         # Process each player
         for idx, player_row in raw_df.iterrows():
             player_id = player_row['player_id']
             position = player_row['position']
-            
+
             # Load player history
             player_history = self.load_player_history(player_id, season, week)
-            
+
             # Skip if no history
             if player_history.empty:
                 continue
-            
+
             # Calculate base rolling averages
             base_features = {
                 'rolling_avg_fantasy_pts': self.calculate_rolling_average(
@@ -496,7 +640,7 @@ class FeatureEngineer:
                 'games_in_history': len(player_history),
                 'has_sufficient_data': len(player_history) >= 6
             }
-            
+
             # Engineer position-specific features
             if position == 'QB':
                 features = self.engineer_qb_features(player_row, player_history, season, week)
@@ -510,22 +654,26 @@ class FeatureEngineer:
                 features = self.engineer_k_features(player_row, player_history, season, week)
             else:
                 continue  # Skip other positions for now
-            
+
             # Update base features
             features.update(base_features)
-            
+
+            # V4: Add Vegas odds features
+            vegas_features = self.add_vegas_features(player_row, vegas_df)
+            features.update(vegas_features)
+
             all_features.append(features)
-        
+
         # Convert to DataFrame
         if all_features:
             features_df = pd.DataFrame(all_features)
-            
+
             # Save to cleaned directory
             output_path = f"{self.cleaned_data_dir}/features_{season}_week_{week}.parquet"
             features_df.to_parquet(output_path, index=False)
-            
+
             return features_df
-        
+
         return None
     
     def engineer_all_features(self, start_season=2020, end_season=2025):

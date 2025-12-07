@@ -2,13 +2,13 @@
 """
 File: src/nfl/v4_odds_fetcher.py
 
-Main orchestrator for fetching NFL Vegas lines from multiple sources.
-Combines ESPN historical data (2020-2024) with Odds API current data (2025).
+Main orchestrator for fetching NFL Vegas lines from The Odds API.
+Fetches current/future NFL betting lines (2025 season).
 
 Usage:
     python3 src/nfl/v4_odds_fetcher.py
 
-Data cached to: data/nfl/vegas_lines/
+Data cached to: data/nfl/vegas_odds/
 """
 
 import sys
@@ -17,7 +17,6 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.nfl.v4_espnscraper import ESPNVegasScraper
 from src.nfl.v4_odds_api import OddsAPIClient
 import pandas as pd
 from datetime import datetime
@@ -25,7 +24,7 @@ from datetime import datetime
 
 class VegasLinesFetcher:
     """
-    Main orchestrator for fetching and managing Vegas lines from multiple sources.
+    Main orchestrator for fetching and managing Vegas lines from The Odds API.
     """
 
     def __init__(self, cache_dir='./data/nfl/vegas_odds', odds_api_key=None):
@@ -34,13 +33,11 @@ class VegasLinesFetcher:
 
         Args:
             cache_dir: Directory to cache all fetched data
-            odds_api_key: API key for The Odds API (optional)
+            odds_api_key: API key for The Odds API (required)
         """
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Note: ESPN scraper deprecated (doesn't have historical betting lines)
-        # self.espn_scraper = ESPNVegasScraper(cache_dir=cache_dir)
         self.odds_api_key = odds_api_key
 
         if odds_api_key:

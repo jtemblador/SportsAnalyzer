@@ -172,16 +172,24 @@ def main():
     start_time = datetime.now()
 
     print_header("V4 MODEL TRAINING WORKFLOW")
-    print("V4 Improvements (Position-Specific Hyperparameters):")
-    print("  ✓ QB: Deeper trees (depth=9), more regularization")
-    print("  ✓ K: Simpler models (depth=3, 100 estimators)")
-    print("  ✓ TE: Moderate complexity (depth=6)")
-    print("  ✓ RB/WR: Standard settings (already work well)")
+    print("V4 Improvements:")
+    print("  Phase 1 - Vegas Odds Integration:")
+    print("    ✓ Team implied totals (volume predictor)")
+    print("    ✓ Point spreads (game script predictor)")
+    print("    ✓ Over/under (pace indicator)")
+    print("    ✓ Home/away context")
+    print("    ✓ Position-specific volume indices")
+    print()
+    print("  Phase 2 - Position-Specific Hyperparameters:")
+    print("    ✓ QB: Deeper trees (depth=9), more regularization")
+    print("    ✓ K: Simpler models (depth=3, 100 estimators)")
+    print("    ✓ TE: Moderate complexity (depth=6)")
+    print("    ✓ RB/WR: Standard settings (already work well)")
     print()
     print("Expected improvements:")
-    print("  - QB: 7.26 → ~6.5-6.8 MAE (10-15% better)")
-    print("  - K: Better generalization (prevent overfitting)")
-    print("  - Overall: 4.66 → ~4.4-4.5 MAE (5% better)")
+    print("  - Phase 1: 0.3-0.5 MAE reduction (game context)")
+    print("  - Phase 2: 0.2 MAE reduction (QB improvement)")
+    print("  - Combined: 4.66 → ~4.2-4.4 MAE (10% better)")
     print()
     print("This will take approximately 20-30 minutes.")
     print("="*80)
@@ -193,17 +201,57 @@ def main():
 
     version = "v4_position_specific"
 
-    # Step 1: Generate features (using V2 features)
+    # Step 0: Fetch Vegas team lines if not cached
+    print_header("STEP 0/4: Checking Vegas Odds Data")
+    print("Vegas team lines are required for V4 features.")
+    print("Checking cache...\n")
+
+    ODDS_API_KEY = 'c6d41f99d9fdabfa5f5abaf8df1c9084'
+
+    from nfl.v4_odds_fetcher import VegasLinesFetcher
+    vegas_fetcher = VegasLinesFetcher(
+        cache_dir=str(project_root / 'data/nfl/vegas_odds'),
+        odds_api_key=ODDS_API_KEY
+    )
+
+    # Check if we have cached data
+    cached_lines = vegas_fetcher.load_cached_team_lines()
+
+    if cached_lines.empty:
+        print("⚠ No Vegas lines cached. Fetching from API...")
+        print("This will use ~1 API call (500/month limit)")
+        fetch_response = input("Fetch Vegas lines now? (y/n): ").strip().lower()
+        if fetch_response != 'y':
+            print("❌ Cannot proceed without Vegas data for V4.")
+            return 1
+
+        vegas_fetcher.fetch_team_lines(force_refresh=False)
+        cached_lines = vegas_fetcher.load_cached_team_lines()
+
+        if cached_lines.empty:
+            print("❌ Failed to fetch Vegas lines. Cannot train V4.")
+            return 1
+    else:
+        weeks = sorted(cached_lines['week'].unique())
+        print(f"✅ Found cached Vegas lines for {len(cached_lines)} games")
+        print(f"   Weeks available: {weeks}")
+        print(f"   Season: {cached_lines['season'].unique()}")
+
+    print("\n✓ Vegas data ready!\n")
+
+    # Step 1: Generate features (V2 features + Vegas odds)
     print_header("STEP 1/4: Generating V4 Features")
-    print("Using same features as V2 (variance, trends, decay=0.85)")
-    print("V4 improvement comes from position-specific MODEL hyperparameters")
+    print("V4 Features (50 total):")
+    print("  - 42 from V2 (variance, trends, decay=0.85)")
+    print("  - 8 NEW Vegas features (spread, totals, volume indices)")
     print("\n⚡ SMART RESUME: Already-generated weeks will be skipped automatically!")
     print("Time: ~5-10 minutes (faster if resuming)\n")
 
     engineer = FeatureEngineer(
         raw_data_dir=str(project_root / 'data/nfl/raw'),
         features_dir=str(project_root / 'data/nfl/features'),
-        version=version
+        version=version,
+        odds_api_key=ODDS_API_KEY  # Enable Vegas features
     )
 
     try:
@@ -219,7 +267,7 @@ def main():
 
     # Step 2: Train models with V4 position-specific hyperparameters
     print_header("STEP 2/4: Training V4 Models (Position-Specific)")
-    print("Training with position-optimized hyperparameters...")
+    print("Training with 50 features (42 V2 + 8 Vegas) using position-optimized hyperparameters...")
     print("  - QB: depth=9, estimators=500, lr=0.005")
     print("  - K: depth=3, estimators=100, lr=0.01")
     print("  - TE: depth=6, estimators=300, lr=0.01")
@@ -340,10 +388,15 @@ def main():
     print("  - V2 QB MAE: 7.19 points")
     print("  - V4 QB MAE: ??? (should be ~6.5-6.8 if improved)")
     print()
+    print("V4 Feature Set:")
+    print("  - 50 total features (42 V2 + 8 Vegas)")
+    print("  - Vegas features: spread, totals, implied points, volume indices")
+    print("  - Position-specific hyperparameters: QB depth=9, K depth=3")
+    print()
     print("If V4 shows improvement:")
-    print(f"  mv data/nfl/features/{version} data/nfl/features/v4_position_specific_maeX.XX")
-    print(f"  mv data/nfl/models/{version} data/nfl/models/v4_position_specific_maeX.XX")
-    print(f"  mv data/nfl/predictions/{version} data/nfl/predictions/v4_position_specific_maeX.XX")
+    print(f"  mv data/nfl/features/{version} data/nfl/features/v4_vegas_odds_maeX.XX")
+    print(f"  mv data/nfl/models/{version} data/nfl/models/v4_vegas_odds_maeX.XX")
+    print(f"  mv data/nfl/predictions/{version} data/nfl/predictions/v4_vegas_odds_maeX.XX")
     print("="*80 + "\n")
 
     return 0
