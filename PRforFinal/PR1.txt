@@ -1,0 +1,379 @@
+Jose Trinidad Temblador
+
+CSC-ITC-492
+
+Fall 2025
+
+Progress Report 1: NFL Player Performance Prediction
+System with Machine Learning and Probabilistic
+Forecasting
+
+Introduction: Background and Significance
+
+Over time, simple macines have become better and better at solve complex problems. It has now
+become possible to develop and model a simple statistical tracking tool to gauge player
+performance by predictive modeling systems. However, most current platforms provide limited
+transparency in their prediction methods, and offer subjective (and often unfair) letter grades
+rather than probabilistic assessments. While also relying on cloud-based systems that lack
+reproducibility and speed for intensive analysis.
+
+This project addresses a sports analytics gap by developing a local-first NFL player
+performance prediction system that combines machine learning algorithms with probabilistic
+forecasting to predict individual player statistics and game performance. The significance of this
+work extends beyond entertainment value.
+
+Technical Significance:
+
+· Demonstrates practical application of machine learning in time-series forecasting.
+·
+·
+
+Implements a robust local-data architecture that prioritizes speed and reproducibility.
+Introduces explainable AI concepts to sports analytics, making complex predictions
+interpretable.
+
+Research Significance:
+
+· The methodologies developed can be horizontally expanded to other sports (NBA, MLB,
+
+soccer, etc.)
+
+· Contributes to the growing field of sports analytics and performance prediction (open
+
+source).
+
+· Provides a framework for handling noisy, incomplete sports data with proper uncertainty
+
+quantification.
+
+· Offers insights into feature engineering for sports performance metrics.
+
+Educational Significance:
+
+· Serves as a comprehensive case study in data engineering, machine learning, and
+
+software architecture.
+
+· Demonstrates real-world application of computer science principles in a domain-specific
+
+context
+
+Jose Trinidad Temblador
+
+CSC-ITC-492
+
+Fall 2025
+
+Project Description
+
+This project will accomplish several key objectives through the development of an integrated
+sports analytics platform:
+
+Core Functionality:
+
+1.
+
+2.
+
+3.
+
+4.
+
+5.
+
+Automated Data Ingestion and Processing: Build a robust ETL pipeline that
+automatically collects, cleans, and processes NFL statistical data from multiple sources.
+Advanced Feature Engineering: Develop sophisticated features including opponent-
+adjusted baselines, rolling averages with exponential decay, usage metrics, injury status
+modifiers, and environmental factors.
+Probabilistic Prediction Models: Implement machine learning models that output
+probability distributions rather than point estimates, providing P-Over-Baseline (POB)
+and Expected Value Over Baseline (EVOB) metrics.
+Local Architecture: Design a high-performance local data store using columnar
+databases (DuckDB) and Parquet files for lightning-fast analytics without cloud
+dependency
+Interactive Dashboard: Create an intuitive web-based interface for exploring player
+statistics, comparing performance, and visualizing predictions with confidence intervals.
+
+Target Audience
+
+This project serves multiple distinct audiences with varying technical backgrounds and
+
+use cases. This work is meant for people who study and work with data, sports, and computer
+
+science. The main group includes computer science researchers who focus on machine learning
+
+in sports, statistics professors who want real-world data for teaching, and data science students
+
+who are learning how to build, store data, and test models. A second group includes sports
+
+analysts, software engineers, and sports fans with technical skills who want clear and useful
+
+prediction tools. The educational community also benefits, such as graduate students in related
+
+fields and industry workers moving into sports analytics due to it’s open source nature. Together,
+
+these groups can use the methods and ideas to better understand sports forecasting and machine
+
+learning.
+
+Jose Trinidad Temblador
+
+CSC-ITC-492
+
+Fall 2025
+
+Prior Related Work
+
+Prior Work by Others
+
+The field of sports analytics has seen significant development over the past two decades, with
+several notable approaches to player performance prediction that this project builds upon while
+introducing key innovations.
+
+Existing Methodologies:
+
+Team-Level Rating Systems: Multiple established systems focus primarily on team-level
+predictions. The Elo rating system, originally developed for chess, has been adapted for NFL
+team ratings by organizations like FiveThirtyEight. Similarly, Massey-Colley ranking systems
+provide team strength assessments. However, these approaches are limited focusing on game
+outcomes rather than individual player performance metrics.
+
+Fantasy Sports Platforms: Commercial platforms like ESPN, Yahoo Fantasy, and DraftKings
+provide player projections, but these systems suffer from several limitations: they typically
+output subjective letter grades (A-F) rather than probabilistic assessments, and offer no
+transparency into their prediction methodologies, and provide no uncertainty quantification or
+confidence intervals.
+
+Academic Research: The NFL Big Data Bowl competitions have produced various approaches
+to player tracking and performance prediction, utilizing advanced metrics like Expected Points
+Added (EPA) and success rate. Research by the nflverse community has established
+standardized datasets and statistical frameworks, particularly through the nflfastR package in
+R.
+
+Key Innovations This Project Introduces:
+
+1.
+
+2.
+
+3.
+
+4.
+
+Probabilistic Player-Level Forecasting: Unlike existing systems that focus on team
+outcomes or provide subjective grades, this project implements probabilistic forecasting
+at the individual player level, outputting P-Over-Baseline (POB) probabilities and
+Expected Value Over Baseline (EVOB) metrics with proper uncertainty quantification.
+Local-First Architecture: Most existing systems rely on cloud-based APIs with rate
+limits and connectivity dependencies. This project implements a local-first approach
+using columnar storage (DuckDB + Parquet) for maximum performance and
+reproducibility.
+Explainable AI Integration: Current platforms provide predictions without
+explanations. This project combines SHAP-based feature importance analysis with GPT-
+powered natural language explanations, making complex ML models interpretable to end
+users.
+Comprehensive Feature Engineering: While existing systems may use basic statistics,
+this project implements sophisticated features including opponent strength adjustments,
+
+Jose Trinidad Temblador
+
+CSC-ITC-492
+
+Fall 2025
+
+exponential decay for recency weighting, usage-based modifiers, injury status integration,
+and environmental factors.
+
+Prior Work by You
+
+Object-Oriented Programming Experience: Through developing a Blackjack simulation
+system, I gained experience with core computer science principles including object-oriented
+programming, polymorphism, and abstraction. This project required implementing complex
+game logic, player behavior modeling, and statistical tracking.
+
+API Integration and Real-Time Data Processing: I created an NBA API project that
+demonstrated proficiency in consuming external APIs, handling real-time data streams, and
+presenting live information through user interfaces. This experience included managing API rate
+limits, data parsing, error handling, and real-time updates.
+
+Data Visualization and User Interface Development: I also created a Weather Application
+project that provided experience in data presentation, user interface design, and geographic data
+processing.
+
+Sports Domain Knowledge: A strong passion for sports, particularly football, provides essential
+domain expertise that technical skills alone cannot replace.
+
+Relevant Coursework Foundation: Through computer science coursework, I've developed
+competencies in:
+
+· Database design and management
+· Machine learning fundamentals
+· Software engineering practices
+· Statistical analysis methods
+
+Technical Expansion for This Project: This NFL analytics project represents a significant
+technical expansion, combining and extending my existing skills into new areas:
+
+· Advanced machine learning model development and evaluation
+· Columnar database systems and high-performance analytics
+· Probabilistic modeling and uncertainty quantification
+· Feature engineering for time-series sports data
+·
+· Development of explainable AI systems
+
+Integration of multiple external APIs and data sources
+
+The combination of technical programming experience, API integration skills, sports domain
+knowledge, and academic foundation positions me well to tackle the complex challenges of
+building a comprehensive NFL player performance prediction system.
+
+Jose Trinidad Temblador
+
+CSC-ITC-492
+
+Fall 2025
+
+Resources and References
+
+Data Sources and APIs
+
+Primary Data Sources:
+
+· nflverse/nfl_data_py: Comprehensive Python package providing access to play-by-play
+data, weekly player statistics, team information, and injury reports. This will serve as the
+primary data source for historical and current season statistics.
+
+· ESPN API: Supplementary real-time data for player status updates, roster changes, and
+
+game information.
+
+· Pro Football Reference: Historical statistics and advanced metrics for baseline
+
+comparisons and model training validation.
+
+Software Dependencies and Development Tools
+
+Core Python Libraries:
+
+· Data Processing: pandas (2.0+), numpy, pyarrow for data manipulation.
+· Database Systems: DuckDB (columnar analytics), SQLite/PostgreSQL (relational
+
+storage).
+
+· Machine Learning: scikit-learn, XGBoost/LightGBM, statsmodels for modeling
+· Explainability: SHAP for feature importance analysis.
+· Visualization: Plotly, Matplotlib, Seaborn for interactive team/player charts.
+
+Web Development Framework:
+
+· Backend: FastAPI for REST API development
+· Frontend: Streamlit for rapid prototyping or React.js for production interface
+· Database ORM: SQLAlchemy for database abstraction
+
+AI Integration:
+
+· OpenAI API: GPT integration for natural language explanations.
+· LangChain: Framework for LLM integration and prompt management.
+
+Jose Trinidad Temblador
+
+CSC-ITC-492
+
+Fall 2025
+
+Timeline and Milestones
+
+Phase 1 (Weeks 1-3): Data Infrastructure
+
+· Set up data ingestion pipeline.
+·
+· Create basic data validation and cleaning processes.
+
+Implement database schema and storage architecture.
+
+Phase 2 (Weeks 4-6): Feature Engineering and Model Train
+
+· Develop advanced feature engineering pipeline.
+·
+· Create initial logistic regression and linear models.
+
+Implement opponent-adjusted baselines and rolling averages.
+
+Phase 3 (Weeks 7-9): Advanced Modeling and Evaluation
+
+Implement gradient boosting models (XGBoost/LightGBM).
+
+·
+· Develop proper probabilistic evaluation framework.
+·
+
+Integrate SHAP explainability features.
+
+Phase 4 (Weeks 10-12): Interface and AI Integration
+
+· Build interactive web dashboard
+·
+·
+
+Integrate GPT for natural language explanations
+Implement final testing and documentation
+
+Jose Trinidad Temblador
+
+CSC-ITC-492
+
+Fall 2025
+
+Database Schema Outline
+
+Core Tables:
+
+·
+
+·
+
+·
+
+·
+
+·
+
+·
+
+·
+
+1.
+
+teams: Team information and metadata.
+players: Player roster data with position and status.
+games: Game schedule and basic information.
+player_game_stats: Individual player statistics per game.
+team_game_stats: Team-level statistics and metrics.
+injuries: Injury reports and player availability.
+features: Engineered features for ML models.
+projections: Model predictions and confidence intervals.
+
+A.3 Machine Learning Pipeline
+
+Data Ingestion: Automated collection from multiple APIs
+Feature Engineering: Rolling averages, opponent adjustments, usage metrics
+
+2.
+3.
+4. Model Training: Walk-forward validation with multiple algorithms
+5.
+
+Evaluation: Model output result interpreted through AI for simpler, more straight
+forward breakdown.
+Prediction Generation: POB/EVOB calculations with uncertainty
+Explanation: SHAP analysis and GPT-powered summaries
+
+6.
+7.
+
+This comprehensive approach ensures a robust, scalable, and explainable system for NFL player
+performance prediction that advances the current state of sports analytics while providing
+valuable learning experiences across multiple computer science domains.
+
+

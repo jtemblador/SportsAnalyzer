@@ -1,0 +1,999 @@
+Jose Temblador
+CSC-492
+Fall 2025
+
+Progress Report 2: NFL Player Performance Prediction System
+
+Design, Implementation, and Analysis
+
+Project Summary
+
+This progress report documents the completion of Phase 2 of my NFL Player
+Performance Prediction System, focusing on the data infrastructure that serves as the
+foundation for machine learning predictions. Over the past several weeks, I’ve developed a
+fully functional data pipeline that automatically collects, filters, stores, sorts, and displays
+NFL player statistics from the 2020 through 2025 seasons.
+
+The system currently contains over 108 parquet files representing six complete NFL
+
+seasons with detailed weekly statistics for thousands of players. This data infrastructure
+supports an interactive Streamlit dashboard that allows users to filter players by position and
+team, view performance trends over time, and analyze weekly trends and statistics. The
+dashboard defaults to showing the most recent week of data and automatically filters out
+inactive players, focusing on starters and high performers.
+
+What makes this implementation significant is its local architecture. Unlike
+
+commercial fantasy platforms that depend on cloud services and rate-limited APIs, this
+system stores all data locally in an optimized columnar format. This design choice enables
+instant complex analytics without network delays and allows the anyone to reproduce results
+exactly. The automated incremental update system checks for new weeks of data and
+downloads only what is missing, making it efficient and user-friendly. I am now transitioning
+into Phase 3, which focuses on feature engineering to build advanced metrics that will feed
+into the machine learning models.
+
+Use Case Analysis
+
+1.1 System Actors and Their Roles
+
+Every software system exists to serve specific users with specific needs. This NFL
+
+analytics platform serves three primary user types, each with different technical backgrounds
+and goals.
+
+The sports analyst represents professional users working for NFL teams, sports
+media companies, or independent analytics firms. These users need accurate, transparent
+predictions they can trust when making recommendations about player performance or game
+strategy. They have the technical skills to understand statistical concepts like confidence
+intervals and value systems that show their work rather than presenting mysterious
+predictions. Being able to see which features influenced a prediction is as important as the
+prediction itself.
+
+The data science student or academic researcher wants to understand how
+
+prediction systems work internally. They might be completing coursework assignments,
+conducting research on machine learning applications, or learning data engineering principles
+through hands-on practice. They need access to both raw data and processed features to
+
+Jose Temblador
+CSC-492
+Fall 2025
+experiment with different modeling approaches. The open-source nature of this project makes
+it valuable for educational purposes.
+
+The fantasy football player with some technical knowledge primarily cares about
+
+practical predictions. These users want to know which players will perform well in upcoming
+games for optimal lineup decisions. They might not understand the mathematical details but
+appreciate when the system explains in plain language why a certain player will have a good
+week. They need fast, easy-to-use interfaces that work on game day when time is limited.
+
+1.2 Core Use Cases
+
+The program supports six primary use cases covering essential functionality needed
+
+by different user types.
+
+Use Case 1: Fetch Latest NFL Data begins when a user sees the system's most
+recent data is from Week 5 but knows Week 6 games have been played. The user clicks
+"Fetch Latest Data" which triggers the automated update process. The system determines
+what data it already has by scanning parquet files and finding the most recent season and
+week. It calculates which weeks are missing and queries the nflverse API for each missing
+week in sequence. As each week downloads, status messages show progress. When a week
+has no data because games have not been played, the system stops and informs the user they
+are up to date. All available new data gets saved as parquet files and the cache clears so the
+dashboard immediately shows updated information.
+
+Use Case 2: Filter Players by Performance typically starts with a fantasy player
+
+wanting to see which running backs had good games in Week 5. They navigate to the Player
+Data Explorer tab where the system has defaulted to the most recent week. They select RB
+from the position dropdown and the system immediately filters to show only running backs.
+The system has already removed players with zero fantasy points, so only active players
+appear. Players are sorted from highest to lowest fantasy points, putting best performers at the
+top. If desired, users can narrow further by selecting a specific team. The table updates
+instantly because all data is stored locally.
+
+Use Case 3: Analyze Player Trends Over Time helps users understand whether
+
+recent performance represents true ability or random variation. A sports analyst evaluating a
+wide receiver goes to the Performance Trends tab and filters to wide receivers. The system
+shows a dropdown list of all wide receivers sorted by total fantasy points for the season, with
+each player's position, team, and total points displayed. This sorting bubbles the most
+relevant players to the top. When the analyst selects a player, the system generates a line
+chart showing weekly statistics. The chart only includes weeks where the player actually
+recorded statistics, so the line does not drop to zero for bye weeks or injuries. An average line
+overlays in red so the analyst can quickly see which weeks were above or below typical
+performance.
+
+Use Case 4: Export Data for External Analysis allows a data science student
+building their own model to access raw data. The student navigates to the data/nfl/raw
+directory and finds files named player_stats_2024_week_1.parquet through
+
+Jose Temblador
+CSC-492
+Fall 2025
+
+player_stats_2024_week_18.parquet. They can load these directly using pandas or any data
+analysis tool. The consistent naming convention makes it easy to write scripts that process
+multiple weeks or entire seasons.
+
+Use Case 5: View Weekly Player Statistics helps fantasy players preparing for drafts
+
+review how players performed over previous seasons. They select a season and week, then
+use column selection checkboxes to choose relevant statistics. If evaluating quarterbacks,
+they check Passing Stats to see completions, attempts, yards, touchdowns, and interceptions.
+The column headers use readable abbreviations like Pass Yds and Rush TDs instead of
+database field names, making the table easier to scan quickly.
+
+Use Case 6: Compare Players by Position and Team answers questions like who is
+the best receiver on the Kansas City Chiefs. The user selects WR from the position filter and
+KC from the team filter. The system shows all Chiefs wide receivers who played that week,
+sorted by fantasy points. The user can immediately see target distribution and identify the
+clear number one receiver versus depth players. They can change the week selector to see if
+this pattern holds consistent across multiple weeks.
+
+Jose Temblador
+CSC-492
+Fall 2025
+
+Sequence Diagrams
+
+2.1 Sequence Diagram 1: Fetch Latest Data
+
+│
+│
+│
+│
+│
+
+┌─────────────┐
+│ File System │
+└──────┬──────┘
+
+┌─────────────────┐
+│ NFLDataPipeline │
+└────────┬────────┘
+
+┌──────────────┐
+┌───────────┐
+┌──────┐
+│ nflverse API │
+│ Dashboard │
+│ User │
+└──────┬───────┘
+└─────┬─────┘
+└──┬───┘
+│
+│
+│
+│
+│
+│
+│
+│ Click "Fetch
+│
+│
+│
+│ Latest Data"
+│
+│
+│──────────────────>│
+│
+│
+│
+│
+│
+│
+│ get_last_downloaded_week()
+│
+│
+│
+│────────────────────────>│
+│
+│
+│
+│
+│
+│
+│
+│ Check parquet files
+│
+│
+│
+│
+│────────────────────────>│
+│
+│
+│
+│
+│
+│
+│
+│
+│ Return (season, week)
+│
+│
+│
+│
+│<────────────────────────│
+│
+│
+│
+│
+│
+│
+│
+│ fetch_player_stats(next_week)
+│
+│
+│
+│────────────────────────────────────────────────>│
+│
+│
+│
+│
+│
+│
+│
+│
+│
+│
+│<────────────────────────────────────────────────│
+│
+│
+│
+│
+│
+│
+│
+│
+│ save_data(parquet)
+│
+│
+│
+│
+│────────────────────────>│
+│
+│
+│
+│
+│
+│
+│
+│
+│
+│
+│
+│
+Confirm save
+│
+│<────────────────────────│
+│
+│
+│
+│
+│ Display success message │
+│
+│
+│
+│<────────────────────────│
+│
+│
+│
+│
+│
+│ Show "Downloaded
+│
+│
+│
+│ X weeks"
+│
+│
+│
+│
+│<──────────────────│
+
+Return player data
+
+│
+
+This above sequence diagram, describes the complete flow of the data fetching
+
+process. When a user initiates a data fetch, the dashboard does not directly access the file
+system or API. Instead, it delegates all data operations to the NFLDataPipeline class, which
+acts as the intermediary. The pipeline first determines what data already exists by checking
+the file system for parquet files. It parses filenames to extract season and week numbers,
+finding the most recent combination.
+
+Once the pipeline knows where to start, it calculates the next week to download and
+
+queries the nflverse API. The API returns raw player statistics as a dataframe, which the
+pipeline validates and converts to the appropriate format. The pipeline then writes this data to
+the file system using a consistent naming convention. Only after successfully saving does the
+pipeline send a success message back to the dashboard, which displays it to the user. This
+layered approach separates concerns, with the dashboard handling presentation, the pipeline
+handling business logic, and the file system and API handling data storage and retrieval.
+
+2.2 Sequence Diagram 2: Filter & Display Players
+
+┌────────────┐
+│ DataLoader │
+└──────┬─────┘
+
+position, team)
+
+┌───────────┐
+│ Dashboard │
+└─────┬─────┘
+│
+
+┌──────┐
+│ User │
+└──┬───┘
+│
+│ Select filters season, week,
+│──────────────────>│
+│
+│
+│
+│
+│
+│
+│
+│
+│
+│
+│
+
+│ load_season_data(season)
+│──────────────────────>│
+│
+│
+│
+│
+│
+Return filtered data │
+│<──────────────────────│
+│
+│
+│
+│
+│
+│
+
+fantasy_points_ppr
+
+(internal)
+
+Sort by
+
+│
+
+│
+
+│
+│
+│
+│
+│
+│ Read parquet files
+│
+│─────────────────────>│
+│
+│
+│<─────────────────────│
+│
+│
+│
+│
+│
+
+Return data
+
+┌─────────────┐
+│ File System │
+└──────┬──────┘
+
+Display sorted
+table
+
+│
+│
+│
+│
+│<──────────────────│
+
+│
+│
+│
+
+Jose Temblador
+CSC-492
+Fall 2025
+
+│
+│
+│
+
+This sequence shows how the dashboard responds to user filter selections. The
+DataLoader component abstracts away the complexity of reading multiple parquet files and
+combining them into a single dataset. When the dashboard requests data for a specific season,
+the DataLoader loops through all possible weeks, checking if files exist and loading those
+that do. It concatenates these individual week files into one comprehensive dataframe before
+returning it
+
+The above dashboard then applies user-selected filters directly to this combined
+
+dataset. Position and team filters reduce the dataset to matching rows, and the sorting
+operation orders players by fantasy points in descending order. All of these operations happen
+in memory using pandas. The final sorted table is rendered to the user with renamed column
+headers for readability. This design keeps data loading separate from data filtering, allowing
+the loading logic to be cached while filters update dynamically.
+
+2.3 Sequence Diagram 3: Analyze Player Trends
+
+│
+│
+│
+│
+│
+
+┌────────────┐
+│ DataLoader │
+└──────┬─────┘
+
+┌──────────────┐
+┌───────────┐
+┌──────┐
+│ Chart Engine │
+│ Dashboard │
+│ User │
+└──────┬───────┘
+└─────┬─────┘
+└──┬───┘
+│
+│
+│
+│
+│
+│ Select position/
+│
+│ team filters
+│
+│
+│──────────────────>│
+│
+│
+│
+│
+│ load_season_data(season)
+│
+│
+│──────────────────────>│
+│
+│
+│
+│
+│
+│
+│ Return all player data│
+│
+│
+│<──────────────────────│
+│
+│
+│
+│
+│
+│
+│
+│ Calculate player
+│
+│
+│
+│ totals, sort
+│
+│
+│
+│ (internal)
+│
+│
+│
+│
+│
+│
+│
+│ Display player
+│
+│
+│
+│ dropdown (sorted) │
+│
+│
+│<──────────────────│
+│
+│
+│
+│
+│
+│
+│ Select player
+│
+│
+│
+│──────────────────>│
+│
+│
+│
+│
+│
+│
+│ Create line chart
+│
+│ (filter week > 0)
+│
+│
+│
+│─────────────────────────────────────────────>│
+│
+│
+│
+│
+│
+│
+Return plotly figure
+│
+│
+│<─────────────────────────────────────────────│
+│
+│
+│
+│
+│
+│
+│
+│
+│ Display chart +
+│
+│
+│ stats table
+│
+│
+│
+│<──────────────────│
+│
+│
+│
+│
+
+This sequence demonstrates the multi-step process of player trend analysis. After
+
+loading the full season dataset, the dashboard performs an aggregation operation to calculate
+total fantasy points for each player. This aggregation groups all weekly records by player
+name and sums their points, creating a ranked list. The dashboard sorts this list and presents it
+to the user as a dropdown where the highest-scoring players appear first.
+
+Class Diagram and System Architecture
+
+3.1 Class Diagram: System Components
+
+Jose Temblador
+CSC-492
+Fall 2025
+
+NFLDataPipeline
+
+- base_data_dir: str
+- nfl_dir: str
+- raw_dir: str
+
+┌─────────────────────────────────────────────────────────────┐
+│
+│
+├─────────────────────────────────────────────────────────────┤
+│
+│ Fields:
+│
+│
+│
+│
+│
+│
+├─────────────────────────────────────────────────────────────┤
+│
+│ Methods:
+│
+│
++ __init__(base_data_dir: str)
+│
+│
++ get_current_week() → int
+│
+│
++ get_current_season() → int
+│
+│
++ get_last_downloaded_week() → tuple[int, int]
+│
+│
++ check_file_exists(season: int, week: int) → bool
+│
+│
++ fetch_player_stats(seasons: list, week: int) → DF
++ save_data(data: DF, season: int, week: int) → str
+│
+│
++ run_pipeline(season: int, week: int, silent: bool) → DF │
+│
+└─────────────────────────────────────────────────────────────┘
+
+│
+│ uses
+▼
+
+DataLoader
+
+- data_dir: str
+- cache: dict
+
+┌─────────────────────────────────────────────────────────────┐
+│
+│
+│
+(Future Implementation)
+│
+├─────────────────────────────────────────────────────────────┤
+│
+│ Fields:
+│
+│
+│
+│
+├─────────────────────────────────────────────────────────────┤
+│
+│ Methods:
+│
+│
+│
+│
+│
+│
+└─────────────────────────────────────────────────────────────┘
+
++ load_season_data(season: int) → DataFrame
++ load_week_data(season: int, week: int) → DataFrame
++ get_player_history(player_name: str) → DataFrame
+
+│
+│ provides data to
+▼
+
+FeatureEngineer
+(Phase 2 - Planned)
+
+- decay_factor: float
+- window_size: int
+
+┌─────────────────────────────────────────────────────────────┐
+│
+│
+│
+│
+├─────────────────────────────────────────────────────────────┤
+│
+│ Fields:
+│
+│
+│
+│
+├─────────────────────────────────────────────────────────────┤
+│
+│ Methods:
+│
+│
+│
+│
+│
+│
+└─────────────────────────────────────────────────────────────┘
+
++ calculate_rolling_average(player_data: DF) → DF
++ adjust_for_opponent(player_data: DF, opp: str) → float
++ calculate_usage_metrics(player_data: DF) → dict
+
+3.2 NFLDataPipeline Class
+
+The NFLDataPipeline class serves as the core component responsible for all data
+
+acquisition and storage operations. This class encapsulates the entire process of fetching data
+from the nflverse API and organizing it into the local file system. The three field variables
+define the directory structure where data is stored. The base_data_dir field defaults to "./data"
+and serves as the root directory for all sports data. The nfl_dir field combines the base
+directory with "/nfl" to create a sport-specific folder, and the raw_dir field adds "/raw" to
+store unprocessed data directly from the API.
+
+The initialization method creates these directories if they do not already exist using
+
+Python's pathlib library. This ensures the system can run on a fresh installation without
+manual directory creation. The get_current_week and get_current_season methods query the
+nflverse API to determine what week and season are currently active in the real NFL
+
+Jose Temblador
+CSC-492
+Fall 2025
+calendar. These methods are useful for validation but are not currently used in the automated
+update process.
+
+The get_last_downloaded_week method implements the logic for incremental
+
+updates. It scans all parquet files in the raw directory, extracts season and week numbers
+from filenames using string splitting, and returns the maximum combination found. If no files
+exist, it returns season 2024, week 18 as a starting point. The check_file_exists method
+constructs the expected filename for a given season and week, then checks if that file exists in
+the file system. This prevents redundant downloads.
+
+The fetch_player_stats method is where data actually comes from the external API. It
+
+accepts a list of seasons and an optional week number, calls the nflreadpy library's
+load_player_stats function, converts the resulting Polars dataframe to pandas for consistency,
+and filters to the specific week if one was provided. The save_data method takes a dataframe
+and writes it to a parquet file with compression, using the standardized naming convention. It
+returns the full file path for confirmation.
+
+The run_pipeline method orchestrates the entire fetch-and-save process. It first checks
+if the data already exists to avoid duplicates, then fetches the data, validates that records were
+returned, prints a summary of what was downloaded, and saves it to disk. The silent_check
+parameter allows suppressing output messages when called in a loop. This method serves as
+the main entry point for both manual data fetching and automated updates.
+
+3.3 DataLoader Class (Future Implementation)
+
+The DataLoader class represents a planned abstraction that does not yet exist as a
+
+separate component. Currently, data loading logic is embedded directly in the Streamlit
+dashboard code. The purpose of creating this class in Phase 2 is to separate data access from
+presentation logic, making the code more maintainable and testable.
+
+The data_dir field will store the path to the data directory, and the cache field will
+
+hold previously loaded dataframes in memory to avoid redundant file reads.
+
+3.4 FeatureEngineer Class (Phase 3 - Not Yet Built)
+
+The FeatureEngineer class will be built during Phase 3 to transform raw statistics into
+features suitable for machine learning. Raw statistics like "rushing yards" or "receptions" are
+useful for analysis but insufficient for prediction because they lack context. Feature
+engineering adds that context.
+
+The decay_factor field will control how much recent games are weighted compared to
+
+older games when calculating rolling averages. A decay factor of 0.9 means the most recent
+game contributes 100% of its value, the previous game contributes 90%, the game before that
+81%, and so on. The window_size field will determine how many games to include in rolling
+calculations.
+
+The calculate_rolling_average method will take a player's historical data and compute
+
+weighted averages that give more importance to recent performance. The
+adjust_for_opponent method will modify baseline expectations based on opponent strength,
+recognizing that 100 rushing yards against the best run defense in the league is more
+
+impressive than 100 yards against the worst. The calculate_usage_metrics method will
+compute what percentage of team plays involve a specific player, helping distinguish
+between a running back who gets 20 carries per game and one who gets 5.
+
+Jose Temblador
+CSC-492
+Fall 2025
+
+Data Architecture and Storage Design
+
+4.1 Entity Relationship Diagram
+
+Player
+
+┌──────────────────────┐
+│
+│
+│──────────────────────│
+│
+│ player_id (PK)
+│
+│ player_name
+│
+│ player_display_name
+│
+│ position
+│
+│ position_group
+│ headshot_url
+│
+└──────────┬───────────┘
+│
+│ has
+│ (1:N)
+│
+▼
+┌──────────────────────┐
+│
+│
+│──────────────────────│
+│
+│ player_id (FK)
+│
+│ season (PK)
+│
+│ week (PK)
+│
+│ season_type
+│
+│ team
+│ opponent_team
+│
+│──────────────────────│
+│
+│ Passing Stats:
+│
+│
+│
+│
+│
+│
+│
+│
+│
+│
+│
+│
+│──────────────────────│
+
+completions
+attempts
+passing_yards
+passing_tds
+passing_int
+passing_epa
+
+Weekly Stats
+
+│──────────────────────│
+│
+│ Rushing Stats:
+│
+carries
+│
+│
+rushing_yards
+│
+rushing_tds
+│
+│
+│
+rushing_epa
+│
+│──────────────────────│
+│
+│ Receiving Stats:
+│
+receptions
+│
+│
+targets
+│
+│
+receiving_yards
+│
+│
+receiving_tds
+│
+│
+│
+target_share
+│──────────────────────│
+│
+│ Fantasy Stats:
+fantasy_points
+│
+│
+│
+fantasy_points_ppr │
+│──────────────────────│
+│ + 70 more columns
+│
+└──────────────────────┘
+
+4.2 Data Storage Architecture
+
+The system uses parquet files instead of a traditional relational database. Parquet is a
+
+columnar storage format originally developed for big data systems like Apache Spark. Unlike
+CSV files that store data row by row, parquet organizes data by columns, which makes it
+extremely efficient for analytics where you typically want to read a few columns across many
+rows rather than reading entire rows.
+
+All data files live in the ./data/nfl/raw/ directory with a strict naming convention.
+
+Every file follows the pattern player_stats_{SEASON}week{WEEK}.parquet, so the file for
+week 5 of the 2025 season is player_stats_2025_week_5.parquet. This naming scheme makes
+it trivial to find data for any specific week and easy to write loops that process entire seasons.
+The raw subdirectory indicates that this data has not been modified from what the API
+provided, maintaining full transparency about data provenance.
+
+Jose Temblador
+CSC-492
+Fall 2025
+
+Testing and Validation
+
+5.1 Test Cases and Results
+
+Test Case 1 verifies data fetching functionality. The input is clicking the "Fetch
+Latest Data" button in the sidebar.This confirms that the incremental update logic works
+correctly and can detect when new data appears.
+
+Test Case 2 verifies position filtering. The input is selecting "QB" from the position
+
+dropdown in the Player Data Explorer tab.
+
+Jose Temblador
+CSC-492
+Fall 2025
+
+Test Case 3 verifies team filtering. The input is selecting "KC" from the team
+
+dropdown.
+
+Test Case 4 verifies the performance trend chart, which was the component that initially had
+the zero-value bug. The input is selecting "J.Love" from the player dropdown and "Rushing
+Yards" as the metric.
+
+Implementation Progress and Future Development
+
+6.1 Current System Capabilities
+
+Phase 1 of the project is now complete with a fully functional data infrastructure. The
+
+automated ETL pipeline handles incremental updates intelligently by checking what data
+already exists and downloading only missing weeks. The system currently stores 108 parquet
+files covering six complete NFL seasons from 2020 through 2025, with 18 weeks per season.
+Each file contains 114 statistical columns for approximately 2,000 to 3,000 players per week,
+depending on roster sizes and player activity.
+
+The interactive Streamlit dashboard provides real-time data fetching through a single
+
+button click that triggers the automated update process. Multi-dimensional filtering allows
+users to narrow results by season, week, position, and team in any combination. Performance
+sorting automatically ranks players from highest to lowest statistics, putting the most relevant
+players at the top of every list. Player trend visualization generates line charts that show
+weekly performance patterns while intelligently filtering out inactive weeks. Weekly stats
+tables display data with clean, readable column names mapped from database field names to
+user-friendly abbreviations.
+
+Jose Temblador
+CSC-492
+Fall 2025
+
+6.2 Next Steps and Timeline
+
+Phase 3 will implement machine learning models during weeks 7 through 9. The POB
+
+model (Probability Over Baseline) will be a binary classifier that predicts whether a player
+will exceed their historical average performance. The EVOB model (Expected Value Over
+Baseline) will be a regression model that predicts by how much a player will exceed or fall
+short of their baseline. Both models will use gradient boosting algorithms, specifically
+XGBoost or LightGBM, which excel at handling tabular data with complex interactions
+between features. Walk-forward validation will ensure that models are only trained on past
+data and evaluated on future data, preventing the look-ahead bias that plagues many sports
+prediction systems.
+
+Phase 4 will add explainable AI features during weeks 10 through 12. SHAP
+(SHapley Additive exPlanations) analysis will show which features contributed most to each
+prediction, helping users understand why the model made specific forecasts. Integration with
+the OpenAI GPT API will translate SHAP values into natural language explanations like
+"The model predicts Tyreek Hill will exceed his baseline this week primarily because he
+faces a weak pass defense and has been targeted heavily in recent games." Final dashboard
+polish will improve the visual design, add export capabilities, and incorporate user feedback
+from testing.
+
+
