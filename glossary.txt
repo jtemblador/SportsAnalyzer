@@ -1,0 +1,74 @@
+
+
+================================================================================
+TECHNICAL TERM GLOSSARY
+================================================================================
+
+MAE (Mean Absolute Error):
+- Average error between predicted and actual fantasy points
+- Example: MAE of 4.26 = average prediction is 4.26 points off
+- Lower is better (0 = perfect predictions)
+- Industry standard: 4.5-5.5 MAE
+- Our V4 achievement: 4.26 MAE ✓
+
+R² (R-squared / Coefficient of Determination):
+- Measures how much variance the model explains
+- Range: 0.0 (no predictive power) to 1.0 (perfect)
+- Example: R² = 0.442 means model explains 44% of fantasy score variance
+- Higher R² = more confident/accurate predictions
+- Negative R² = model performs worse than predicting the mean
+
+POB (Probability Over Baseline):
+- Binary classification: Will player beat their average?
+- Example: "70% chance to exceed baseline of 15 points"
+- Used to identify breakout games vs. duds
+- Helps with DFS strategy (target high POB players)
+
+EVOB (Expected Value Over Baseline):
+- Regression: How much over/under average?
+- Example: "+5.2 points above baseline"
+- Predicts deviation from player's normal performance
+- More nuanced than POB (gives magnitude, not just yes/no)
+
+STAT (Direct Prediction):
+- Direct prediction of raw stat
+- Example: "285 passing yards, 2 TDs"
+- Most straightforward model type
+- Used for specific stat predictions (passing_yards, rushing_tds, etc.)
+
+CatBoost (Gradient Boosting Algorithm):
+- Machine learning algorithm we use
+- Handles mixed data types (numeric + categorical)
+- Resistant to overfitting
+- Fast training and prediction
+- Alternative to XGBoost, LightGBM, RandomForest
+
+Confidence Intervals:
+- Range where we expect actual result to fall
+- Example: "22.6 points [18.4 - 26.8] with 80% confidence"
+- Calculated using ensemble variance (std of multiple models)
+- Formula: lower = mean - 1.645×std, upper = mean + 1.645×std
+- Z-score: 1.645 for 80% CI, 1.96 for 95% CI
+
+Decay Weighting:
+- Emphasizes recent games over old games
+- V4 uses decay = 0.85
+- Recent 3 games = 60.7% of total weight
+- Captures hot/cold streaks and recent form
+- Lower decay = more emphasis on recent games
+
+Hyperparameters:
+- Settings that control model behavior
+- Key parameters:
+  * depth: max tree depth (how complex patterns can be)
+  * iterations/n_estimators: number of trees
+  * learning_rate: how fast model learns
+- Position-specific in V4 (QB needs depth=9, K needs depth=3)
+
+Vegas Betting Lines:
+- Team spread: Expected point differential (e.g., KC -7 = 7-point favorite)
+- Over/under: Total expected points in game (e.g., 48.5 points)
+- Implied totals: Expected team score (spread + over/under / 2)
+- Game script predictor: Trailing teams pass more, leading teams rush more
+
+
