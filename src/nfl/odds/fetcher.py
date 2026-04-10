@@ -15,9 +15,9 @@ import sys
 from pathlib import Path
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from src.nfl.v4_odds_api import OddsAPIClient
+from src.nfl.odds.api_client import OddsAPIClient
 import pandas as pd
 from datetime import datetime
 

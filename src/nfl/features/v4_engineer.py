@@ -30,8 +30,8 @@ from datetime import datetime
 import sys
 
 # Import Vegas odds fetcher
-sys.path.insert(0, str(Path(__file__).parent))
-from v4_odds_fetcher import VegasLinesFetcher
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+from src.nfl.odds.fetcher import VegasLinesFetcher
 
 
 class FeatureEngineer:

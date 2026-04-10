@@ -1,0 +1,110 @@
+"""
+Smoke tests to verify the NFL prediction pipeline is functional.
+Run before and after reorganization to ensure nothing broke.
+"""
+
+import sys
+import pytest
+from pathlib import Path
+
+# Project root
+ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(ROOT))
+
+
+class TestImports:
+    """Verify all core modules can be imported."""
+
+    def test_import_pipeline(self):
+        from src.nfl.data.pipeline import NFLDataPipeline
+        assert NFLDataPipeline is not None
+
+    def test_import_column_mappings(self):
+        from src.nfl.data.column_mappings import COLUMN_DISPLAY_NAMES
+        assert isinstance(COLUMN_DISPLAY_NAMES, dict)
+        assert len(COLUMN_DISPLAY_NAMES) > 50
+
+    def test_import_feature_engineer(self):
+        from src.nfl.features.engineer import FeatureEngineer
+        assert FeatureEngineer is not None
+
+    def test_import_v3_feature_engineer(self):
+        from src.nfl.features.v3_engineer import V3FeatureEngineer
+        assert V3FeatureEngineer is not None
+
+    def test_import_v4_feature_engineer(self):
+        from src.nfl.features.v4_engineer import FeatureEngineer
+        assert FeatureEngineer is not None
+
+    def test_import_base_models(self):
+        from src.nfl.models.base import NFLModelPipeline, POBModel, EVOBModel, StatPredictor
+        assert NFLModelPipeline is not None
+        assert POBModel is not None
+
+    def test_import_v4_models(self):
+        from src.nfl.models.v4_models import PositionSpecificEVOBModel
+        assert PositionSpecificEVOBModel is not None
+
+    def test_import_odds_client(self):
+        from src.nfl.odds.api_client import OddsAPIClient
+        assert OddsAPIClient is not None
+
+    def test_import_odds_fetcher(self):
+        from src.nfl.odds.fetcher import VegasLinesFetcher
+        assert VegasLinesFetcher is not None
+
+
+class TestDataFiles:
+    """Verify data files exist and are readable."""
+
+    def test_raw_data_exists(self):
+        raw_dir = ROOT / "data" / "nfl" / "raw"
+        parquet_files = list(raw_dir.glob("*.parquet"))
+        assert len(parquet_files) > 0, "No raw data files found"
+
+    def test_feature_files_exist(self):
+        features_dir = ROOT / "data" / "nfl" / "features" / "v4_position_specific"
+        parquet_files = list(features_dir.glob("*.parquet"))
+        assert len(parquet_files) > 0, "No V4 feature files found"
+
+    def test_model_files_exist(self):
+        models_dir = ROOT / "data" / "nfl" / "models" / "v4_position_specific"
+        joblib_files = list(models_dir.glob("*.joblib"))
+        assert len(joblib_files) > 0, "No V4 model files found"
+
+    def test_prediction_files_exist(self):
+        pred_dir = ROOT / "data" / "nfl" / "predictions" / "v4_position_specific"
+        parquet_files = list(pred_dir.glob("*.parquet"))
+        assert len(parquet_files) > 0, "No V4 prediction files found"
+
+    def test_raw_data_readable(self):
+        import pandas as pd
+        raw_dir = ROOT / "data" / "nfl" / "raw"
+        first_file = sorted(raw_dir.glob("*.parquet"))[0]
+        df = pd.read_parquet(first_file)
+        assert len(df) > 0
+        assert "player_name" in df.columns
+
+    def test_prediction_data_readable(self):
+        import pandas as pd
+        pred_dir = ROOT / "data" / "nfl" / "predictions" / "v4_position_specific"
+        first_file = sorted(pred_dir.glob("*.parquet"))[0]
+        df = pd.read_parquet(first_file)
+        assert len(df) > 0
+
+
+class TestPipelineInstantiation:
+    """Verify core classes can be instantiated."""
+
+    def test_pipeline_init(self):
+        from src.nfl.data.pipeline import NFLDataPipeline
+        pipeline = NFLDataPipeline(base_data_dir=str(ROOT / "data"))
+        assert pipeline is not None
+        assert Path(pipeline.raw_dir).exists()
+
+    def test_model_loading(self):
+        import joblib
+        models_dir = ROOT / "data" / "nfl" / "models" / "v4_position_specific"
+        first_model = sorted(models_dir.glob("*.joblib"))[0]
+        model = joblib.load(first_model)
+        assert model is not None

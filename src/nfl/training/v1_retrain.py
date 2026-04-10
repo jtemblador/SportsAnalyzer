@@ -23,12 +23,12 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
-# Get project root (3 levels up: src/nfl/ -> src/ -> project/)
-project_root = Path(__file__).parent.parent.parent
+# Get project root (4 levels up: src/nfl/training/ -> src/nfl/ -> src/ -> project/)
+project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from nfl.feature_engineer import FeatureEngineer
-from nfl.ml_models import NFLModelPipeline
+from nfl.features.engineer import FeatureEngineer
+from nfl.models.base import NFLModelPipeline
 
 def print_header(title):
     """Print formatted header"""
@@ -111,7 +111,7 @@ def main():
 
     # Load all trained models before generating predictions
     print("\n🔄 Loading all trained models for prediction...")
-    from nfl.ml_models import POBModel, EVOBModel, StatPredictor
+    from nfl.models.base import POBModel, EVOBModel, StatPredictor
     import joblib
 
     model_files = list(pipeline.model_dir.glob("*.joblib"))

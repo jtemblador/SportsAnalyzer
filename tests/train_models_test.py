@@ -12,9 +12,9 @@ from pathlib import Path
 from datetime import datetime
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.nfl.ml_models import NFLModelPipeline
+from src.nfl.models.base import NFLModelPipeline
 
 
 def main():

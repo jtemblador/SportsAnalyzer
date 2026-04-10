@@ -12,9 +12,9 @@ from pathlib import Path
 from datetime import datetime
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from src.nfl.ml_models import NFLModelPipeline
+from src.nfl.models.base import NFLModelPipeline
 
 
 def main():
@@ -68,7 +68,7 @@ def main():
     print()
 
     # Load models for each position
-    from src.nfl.ml_models import POBModel, EVOBModel, StatPredictor
+    from src.nfl.models.base import POBModel, EVOBModel, StatPredictor
     import joblib
 
     print("Loading models into pipeline...")

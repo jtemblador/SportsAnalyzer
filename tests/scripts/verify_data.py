@@ -13,7 +13,7 @@ from pathlib import Path
 # Add src to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.nfl.ml_models import NFLModelPipeline
+from src.nfl.models.base import NFLModelPipeline
 
 
 def verify_data_loading():

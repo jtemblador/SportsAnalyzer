@@ -15,8 +15,8 @@ import sys
 # Add src directory to path for imports
 sys.path.append(str(Path(__file__).parent / "src"))
 
-from nfl.nfl_pipeline import NFLDataPipeline
-from nfl.column_mappings import COLUMN_DISPLAY_NAMES
+from nfl.data.pipeline import NFLDataPipeline
+from nfl.data.column_mappings import COLUMN_DISPLAY_NAMES
 
 
 # Position full names mapping

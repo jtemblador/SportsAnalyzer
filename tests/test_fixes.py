@@ -13,7 +13,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from nfl.ml_models import NFLModelPipeline
+from nfl.models.base import NFLModelPipeline
 import pandas as pd
 
 def test_week_offset_fix():

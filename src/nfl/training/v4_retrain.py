@@ -21,17 +21,17 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
-# Get project root (3 levels up: src/nfl/ -> src/ -> project/)
-project_root = Path(__file__).parent.parent.parent
+# Get project root (4 levels up: src/nfl/training/ -> src/nfl/ -> src/ -> project/)
+project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from nfl.v4_feature_engineer import FeatureEngineer
-from nfl.v4_ml_models import PositionSpecificEVOBModel as EVOBModel
-from nfl.v4_ml_models import PositionSpecificPOBModel as POBModel
-from nfl.v4_ml_models import PositionSpecificStatPredictor as StatPredictor
+from nfl.features.v4_engineer import FeatureEngineer
+from nfl.models.v4_models import PositionSpecificEVOBModel as EVOBModel
+from nfl.models.v4_models import PositionSpecificPOBModel as POBModel
+from nfl.models.v4_models import PositionSpecificStatPredictor as StatPredictor
 
 # Import the pipeline but we'll override the model classes
-from nfl.ml_models import NFLModelPipeline
+from nfl.models.base import NFLModelPipeline
 
 
 def print_header(title):
@@ -208,7 +208,7 @@ def main():
 
     ODDS_API_KEY = 'c6d41f99d9fdabfa5f5abaf8df1c9084'
 
-    from nfl.v4_odds_fetcher import VegasLinesFetcher
+    from nfl.odds.fetcher import VegasLinesFetcher
     vegas_fetcher = VegasLinesFetcher(
         cache_dir=str(project_root / 'data/nfl/vegas_odds'),
         odds_api_key=ODDS_API_KEY
