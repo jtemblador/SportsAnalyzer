@@ -2,10 +2,13 @@
 
 ## Current State
 - V4 production model: 4.26 MAE (17% improvement over V1 baseline)
-- All data stored as Parquet files on disk — **only pulling `load_player_stats()` (1 of 14 useful datasets)**
+- **Phase 0 complete:** 12 datasets fetched, 247 Parquet files, 791,000+ records (2018-2025)
+- All data stored as per-season Parquet files on disk (consistent format across all datasets)
+- 9 fetcher classes registered in unified pipeline (`fetch_all()` and `fetch_latest()`)
+- 179 tests across project
 - Streamlit dashboard reads directly from Parquet
 - Project restructured into modular `src/nfl/` sub-packages
-- Full dataset audit completed — see `docs/AVAILABLE_DATASETS.md`
+- Full dataset audit — see `docs/AVAILABLE_DATASETS.md`
 
 ## Goal
 1. Expand data collection to all useful nflreadpy datasets (Tier 1 + Tier 2)
@@ -164,6 +167,15 @@ Every task follows the phase files in `.claude/instructions/`:
 - [x] Each fetcher skips if data already exists (same pattern as current raw stats)
 - [x] Verify: running `fetch_all()` pulls all 12 datasets, skips already-downloaded data
 - [x] **Deliverable:** Single entry point to fetch all data: `python src/nfl/data/pipeline.py`
+
+### Task 0.14 — Player Stats Fetcher (per-season reorganization)
+- [x] Create `src/nfl/data/fetch_player_stats.py` — PlayerStatsFetcher class
+- [x] Re-fetch player stats as per-season files (8 files vs 144 per-week files)
+- [x] Includes playoff weeks 19-22 (previously missing from raw/)
+- [x] Data matching tests: regular season rows match old raw files exactly, columns identical
+- [x] Register in pipeline fetch_all() and fetch_latest()
+- [x] **Deliverable:** `data/nfl/player_stats/` — 8 per-season files, 147,223 records
+- [x] **Note:** `data/nfl/raw/` kept as backup until PostgreSQL confirms data integrity
 
 ---
 
