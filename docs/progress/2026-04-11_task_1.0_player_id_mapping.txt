@@ -1,0 +1,42 @@
+Task 1.0 — Data Catalog + Player ID Mapping Table
+Date: 2026-04-11
+Status: Complete
+Tests: 15 new (194 total across project)
+
+Goal
+-----
+Create a player reference table with GSIS<->PFR ID mapping so snap counts
+and PFR advstats can join to player stats. Also created the data catalog
+(DATA_CATALOG.md) documenting all datasets, columns, and join keys.
+
+Approach
+--------
+- Used nfl.load_players() which returns 24,376 all-time players back to 1974.
+- Filtered to last_season >= 2018 -> 6,543 players (our training window).
+- 6,425 have both GSIS + PFR IDs (98.2%).
+- Added get_id_mapping() convenience method for cross-dataset joins.
+
+Key Finding: Player Count
+--------------------------
+load_players() has 24,376 entries but that's ALL-TIME (back to 1974).
+Only ~1,700 are active NFL players at any given time. Our filtered set
+of 6,543 covers everyone who played in any season since 2018.
+
+Coverage Verification
+---------------------
+- Player stats 2024: 99.8% covered (1,996/2,001 player_ids mapped)
+- Snap counts 2024: 99.7% covered (2,185/2,192 pfr_player_ids mapped)
+- PFR pass 2024: 100% covered (106/106)
+- Missing players are non-fantasy positions (G, DT, CB) — no impact on predictions.
+
+Implementation
+--------------
+Created:
+- src/nfl/data/fetch_players.py — PlayersFetcher class with get_id_mapping()
+- data/nfl/players/players.parquet — 6,543 players, 39 columns
+- tests/test_fetch_players.py — 15 tests across 4 test classes
+- docs/DATA_CATALOG.md — complete reference for all 13 datasets
+
+Modified:
+- src/nfl/data/pipeline.py — registered PlayersFetcher, added to fetch_all()
+  and fetch_latest()

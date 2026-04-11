@@ -189,12 +189,12 @@ Two ID formats exist across our datasets:
 `nfl.load_players()` provides the mapping table (24,376 all-time players back to 1974). For our purposes, only ~3,300 players are relevant (last_season >= 2024). 22,214 have both GSIS + PFR IDs.
 
 ### Task 1.0 — Data catalog and player ID mapping table
-- [ ] Create `docs/DATA_CATALOG.md` — complete reference of all datasets, columns, join keys, quirks
-- [ ] Fetch `nfl.load_players()` and store as `data/nfl/players/players.parquet`
-- [ ] Build GSIS↔PFR ID mapping filtered to relevant players (last_season >= 2018)
-- [ ] Verify mapping covers all players in snap_counts and pfr_advstats
-- [ ] Add PlayerMappingFetcher to pipeline
-- [ ] **Deliverable:** Data catalog doc + player ID lookup table for cross-dataset joins
+- [x] Create `docs/DATA_CATALOG.md` — complete reference of all datasets, columns, join keys, quirks
+- [x] Fetch `nfl.load_players()` and store as `data/nfl/players/players.parquet`
+- [x] Build GSIS↔PFR ID mapping filtered to relevant players (last_season >= 2018) — 6,543 players
+- [x] Verify mapping covers all players in snap_counts (99.7%) and pfr_advstats (100%)
+- [x] Add PlayersFetcher to pipeline with `get_id_mapping()` convenience method
+- [x] **Deliverable:** Data catalog doc + player ID lookup table for cross-dataset joins
 
 ---
 
