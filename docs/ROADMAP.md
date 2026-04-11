@@ -158,12 +158,12 @@ Every task follows the phase files in `.claude/instructions/`:
 - [x] **Deliverable:** Weekly starter/backup status for all players, 2018-2024
 
 ### Task 0.13 — Unified data pipeline update
-- [ ] Update `NFLDataPipeline` in `src/nfl/data/pipeline.py` to orchestrate ALL fetch scripts
-- [ ] Add `fetch_all()` method that runs all fetchers for a given season range
-- [ ] Add `fetch_latest()` method that only fetches the most recent week across all datasets
-- [ ] Each fetcher skips if data already exists (same pattern as current raw stats)
-- [ ] Verify: running `fetch_all()` pulls all 12 datasets, skips already-downloaded data
-- [ ] **Deliverable:** Single entry point to fetch all data: `python src/nfl/data/pipeline.py`
+- [x] Update `NFLDataPipeline` in `src/nfl/data/pipeline.py` to orchestrate ALL fetch scripts
+- [x] Add `fetch_all()` method that runs all fetchers for a given season range
+- [x] Add `fetch_latest()` method that only fetches the most recent week across all datasets
+- [x] Each fetcher skips if data already exists (same pattern as current raw stats)
+- [x] Verify: running `fetch_all()` pulls all 12 datasets, skips already-downloaded data
+- [x] **Deliverable:** Single entry point to fetch all data: `python src/nfl/data/pipeline.py`
 
 ---
 

@@ -1,0 +1,44 @@
+Task 0.13 — Unified Data Pipeline Update
+Date: 2026-04-11
+Status: Complete
+Tests: 21 new (161 total across project)
+
+Goal
+-----
+Finalize the unified data pipeline so running a single command fetches all
+12 datasets. Add fetch_latest() for in-season use (current season only).
+Verify all 8 fetchers are registered and all data directories are populated.
+
+Approach
+--------
+- Added fetch_latest() which fetches current season only with force=True
+  on season-level files (schedules, injuries, etc.) so they update with
+  new weeks. Player stats use per-week skip logic (no force needed).
+- Removed stale "Future fetchers" comment — all Phase 0 fetchers registered.
+- Added --latest CLI flag for in-season updates.
+- Created comprehensive integration tests verifying all 8 fetcher
+  registrations, method existence, and data directory population.
+
+Implementation
+--------------
+Modified:
+- src/nfl/data/pipeline.py — added fetch_latest(), updated __main__ with
+  --latest flag, removed stale comments
+
+Created:
+- tests/test_pipeline_integration.py — 21 tests across 3 test classes
+
+Validation
+----------
+- All 8 fetchers confirmed registered via isinstance checks.
+- fetch_all() and fetch_latest() confirmed callable.
+- All 9 data directories verified populated:
+  raw (144 files), schedules (8), injuries (8), snap_counts (8),
+  nextgen_stats (24), ff_opportunity (8), pfr_advstats (24),
+  team_stats (8), depth_charts (7)
+- Total: 239+ Parquet files across all datasets.
+
+Usage
+-----
+  python src/nfl/data/pipeline.py           # Fetch all datasets 2018-2025
+  python src/nfl/data/pipeline.py --latest  # Fetch current season only

@@ -326,15 +326,51 @@ class NFLDataPipeline:
         # 13. Depth charts (starter/backup status, 2018-2024 only)
         self.depth_chart_fetcher.fetch_all(start_season, end_season)
 
-        # Future fetchers will be added here as tasks are completed:
-
         print()
         print("=" * 60)
         print("All datasets up to date!")
         print("=" * 60)
 
+    def fetch_latest(self):
+        """
+        Fetch only the current season across all datasets.
+        Use this during a live season to pull the latest week's data.
+        """
+        season = self.get_current_season()
+
+        print("=" * 60)
+        print(f"NFL DATA PIPELINE - Fetch Latest ({season} season)")
+        print("=" * 60)
+        print()
+
+        # Player stats — current season only
+        self.fetch_all_player_stats(start_season=season, end_season=season)
+
+        # All other datasets — re-fetch current season (force=True for season-level files)
+        self.schedule_fetcher.fetch_season(season, force=True)
+        self.injury_fetcher.fetch_season(season, force=True)
+        self.snap_count_fetcher.fetch_season(season, force=True)
+        for stat_type in ['passing', 'rushing', 'receiving']:
+            self.nextgen_stats_fetcher.fetch_season(season, stat_type, force=True)
+        self.ff_opportunity_fetcher.fetch_season(season, force=True)
+        for stat_type in ['pass', 'rush', 'rec']:
+            self.pfr_advstats_fetcher.fetch_season(season, stat_type, force=True)
+        self.team_stats_fetcher.fetch_season(season, force=True)
+        self.depth_chart_fetcher.fetch_season(season)
+
+        print()
+        print("=" * 60)
+        print(f"{season} season data up to date!")
+        print("=" * 60)
+
 
 # Allow this file to be run independently
 if __name__ == "__main__":
-    pipeline = NFLDataPipeline()
-    pipeline.fetch_all()
+    import sys
+
+    if '--latest' in sys.argv:
+        pipeline = NFLDataPipeline()
+        pipeline.fetch_latest()
+    else:
+        pipeline = NFLDataPipeline()
+        pipeline.fetch_all()
