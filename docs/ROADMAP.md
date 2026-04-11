@@ -2,13 +2,14 @@
 
 ## Current State
 - V4 production model: 4.26 MAE (17% improvement over V1 baseline)
-- **Phase 0 complete:** 12 datasets fetched, 247 Parquet files, 791,000+ records (2018-2025)
-- All data stored as per-season Parquet files on disk (consistent format across all datasets)
-- 9 fetcher classes registered in unified pipeline (`fetch_all()` and `fetch_latest()`)
-- 179 tests across project
-- Streamlit dashboard reads directly from Parquet
+- **Phase 0 complete:** 13 datasets fetched, 248 Parquet files, 798,000+ records (2018-2025)
+- **Phase 1 (Tasks 1.0-1.3) complete:** PostgreSQL database with 798,176 rows across 14 tables, verified against NFL.com
+- 10 fetcher classes registered in unified pipeline (`fetch_all()` and `fetch_latest()`)
+- 211 tests across project
+- `app.py` (Streamlit dashboard) is broken — uses legacy pipeline code that was removed. Will be rebuilt in Task 2.3.
 - Project restructured into modular `src/nfl/` sub-packages
 - Full dataset audit — see `docs/AVAILABLE_DATASETS.md`
+- V1-V4 legacy code still exists in `src/nfl/features/`, `src/nfl/models/`, `src/nfl/training/`, `src/nfl/odds/` — kept as reference for V5, cleanup planned
 
 ## Goal
 1. Expand data collection to all useful nflreadpy datasets (Tier 1 + Tier 2)
@@ -249,70 +250,60 @@ Two ID formats exist across our datasets:
 - [x] Verify total row counts match Parquet files + third-party verified against NFL.com box scores
 - [x] **Deliverable:** 798,176 rows across 14 tables, all queryable in PostgreSQL
 
-### Task 1.4 — Dual-write data pipeline
-- [ ] Modify data pipeline so every fetch writes to both Parquet AND PostgreSQL
-- [ ] All fetcher classes insert into their respective DB tables after saving Parquet
-- [ ] New players and teams auto-inserted on first encounter
-- [ ] **Deliverable:** `python src/nfl/data/pipeline.py` writes to both destinations
+### Task 1.4 — Database refresh after fetch
+- [ ] Add `refresh_db()` method to pipeline that calls `load_all()` after `fetch_all()` or `fetch_latest()`
+- [ ] Update `__main__` to support `--refresh-db` flag: fetch new data then reload DB
+- [ ] Test: run with `--latest --refresh-db` and verify new data appears in both Parquet and DB
+- [ ] **Deliverable:** `python src/nfl/data/pipeline.py --latest --refresh-db` keeps both in sync
+- [ ] **Note:** Simpler than true dual-write (modifying 10 fetcher classes). Full reload takes ~10 min but is idempotent and reliable.
 
-### Task 1.5 — Database smoke tests
-- [ ] Test connection, table existence, row counts per table
-- [ ] Test basic queries: player by name, stats by week, team lookup, injury by week
-- [ ] Test cross-ID join: player_stats (GSIS) → players → snap_counts (PFR) for same player
-- [ ] Test that loaded data matches sample Parquet files exactly
-- [ ] Test dual-write: mock a fetch → verify data in both Parquet and DB
-- [ ] **Deliverable:** `tests/test_database.py` passes
+### Task 1.5 — Legacy data cleanup
+- [ ] Delete `data/nfl/raw/` (144 per-week files, replaced by `data/nfl/player_stats/`)
+- [ ] Delete `data/nfl/cleaned/` (empty directory)
+- [ ] Delete `data/nfl/vegas_odds/` (3 files from paid Odds API, replaced by schedule data)
+- [ ] Update `.gitignore` if needed
+- [ ] Verify tests still pass after removal
+- [ ] **Deliverable:** Clean data directory with only current per-season files
 
 ---
 
-## Phase 2: Pipeline Reads from DB
-**Goal:** Feature engineering and dashboard read from PostgreSQL instead of Parquet files.
+## Phase 2: Query Layer, Feature Engineering, and Dashboard
+**Goal:** Build SQL query functions, V5 feature engineer using all new data, and rebuild the dashboard.
 
 ### Task 2.1 — Database query layer
 - [ ] Create `src/nfl/db/queries.py` — reusable query functions:
   - `get_player_history(player_id, season, week, games_back)` — single SQL query replaces loading N Parquet files
   - `get_week_stats(season, week, position)` — replaces `pd.read_parquet()`
   - `get_player_injuries(player_id, season, week)` — injury status for a player
-  - `get_snap_share(player_id, season, week)` — snap count percentage
+  - `get_snap_share(player_id, season, week)` — snap count percentage (handles PFR→GSIS ID mapping)
   - `get_game_context(season, week, team)` — Vegas lines, weather, rest days
   - `get_opponent_defense_rank(team, position, season, week)` — uses team_stats table
   - `get_nextgen_stats(player_id, season, stat_type)` — NGS metrics
 - [ ] **Deliverable:** All common data access patterns available as SQL queries
 
-### Task 2.2 — Feature engineer reads from DB
-- [ ] Create DB-backed version of `load_player_history()` (single SQL query vs loading N Parquet files)
-- [ ] Add `source='db'` or `source='parquet'` parameter to FeatureEngineer
-- [ ] Benchmark: DB reads should be faster for cross-week queries
-- [ ] **Deliverable:** Feature engineering can run against PostgreSQL
+### Task 2.2 — Legacy code cleanup
+- [ ] Delete `src/nfl/odds/` — paid Odds API code, replaced by free schedule data in DB
+- [ ] Review `src/nfl/features/` (V1-V4 engineers) — keep as reference, document what to carry forward to V5
+- [ ] Review `src/nfl/models/` (V1-V4 model classes) — keep as reference for V5
+- [ ] Review `src/nfl/training/` (V1-V4 retrain scripts) — keep as reference for V5
+- [ ] Remove any dead imports or references to deleted code
+- [ ] Update smoke tests if they reference deleted modules
+- [ ] **Deliverable:** Dead code removed, legacy code documented as reference
 
-### Task 2.3 — Dashboard rebuild (new app.py)
-- [ ] Rebuild `app.py` from scratch — old version uses legacy per-week raw files and is now broken
-- [ ] Use old `app.py` as a reference for layout and features, not as a starting point
-- [ ] Read data from PostgreSQL (with per-season Parquet fallback)
-- [ ] Tabs: Player Explorer, Performance Trends, Predictions, Model Accuracy
-- [ ] Use all new datasets: show injuries, snap counts, NGS metrics, expected fantasy points
-- [ ] Streamlit filters translate to SQL WHERE clauses
-- [ ] **Deliverable:** Fully rebuilt dashboard backed by PostgreSQL and new data pipeline
-
-### Task 2.4 — Load predictions and model runs into DB
+### Task 2.3 — Load predictions and model runs into DB
 - [ ] Create `predictions` and `model_runs` tables
 - [ ] Write ETL to load all `data/nfl/predictions/` (all versions) into database
 - [ ] Store model metadata (version, position, algorithm, MAE, hyperparams)
 - [ ] Backfill `actual_value` column by joining predictions with weekly_stats
 - [ ] **Deliverable:** Cross-version accuracy queries work in SQL
 
+
 ---
 
 ## Phase 3: V5 Model Improvements
 **Goal:** Use all new data sources + database to improve MAE below 4.0.
 
-### Task 3.1 — Replace paid Odds API with schedule data
-- [ ] Rewrite V4 Vegas features to pull from `games` table (nflreadpy schedule data)
-- [ ] Remove dependency on `src/nfl/odds/api_client.py` and The Odds API
-- [ ] Verify V4 MAE is preserved or improved with the new odds source
-- [ ] **Deliverable:** V4 model works without paid API, using free schedule data
-
-### Task 3.2 — V5 feature engineering
+### Task 3.1 — V5 feature engineering
 - [ ] Build new features from the expanded datasets:
   - **From schedules:** implied team total, spread, weather features (wind, temp, dome), rest days, divisional game flag
   - **From injuries:** teammate injury impact (is WR1 out? is starting QB out?), player's own injury status
@@ -329,14 +320,14 @@ Two ID formats exist across our datasets:
 - [ ] Target: 70-80 features (up from V4's 50)
 - [ ] **Deliverable:** V5 feature engineer in `src/nfl/features/v5_engineer.py`
 
-### Task 3.3 — V5 model training and evaluation
+### Task 3.2 — V5 model training and evaluation
 - [ ] Train V5 models with expanded feature set
 - [ ] Compare MAE against V4 (4.26) per position
 - [ ] Feature importance analysis — which new datasets helped most?
 - [ ] Position-specific tuning
 - [ ] **Target MAE:** < 4.0
 
-### Task 3.4 — Prediction accuracy dashboard
+### Task 3.3 — Prediction accuracy dashboard
 - [ ] New Streamlit tab: model accuracy over time, by position, by version
 - [ ] Powered by SQL queries joining predictions with actuals
 - [ ] Visual: predicted vs actual scatter plots, MAE trend charts
@@ -344,18 +335,27 @@ Two ID formats exist across our datasets:
 
 ---
 
-## Phase 4: Production Hardening (Future)
-**Goal:** Make the project production-grade and impressive on a resume.
+## Phase 4: Dashboard & Production Hardening (Future)
+**Goal:** Rebuild the dashboard with all data sources and make the project production-grade.
 
-### Task 4.1 — FastAPI REST endpoints
+### Task 4.1 — Dashboard rebuild (new app.py)
+- [ ] Rebuild `app.py` from scratch — old version uses legacy per-week raw files and is broken
+- [ ] Use old `app.py` as a reference for layout and features, not as a starting point
+- [ ] Read data from PostgreSQL via query layer (Task 2.1)
+- [ ] Tabs: Player Explorer, Performance Trends, Predictions, Model Accuracy
+- [ ] Use all new datasets: show injuries, snap counts, NGS metrics, expected fantasy points
+- [ ] Streamlit filters translate to SQL WHERE clauses
+- [ ] **Deliverable:** Fully rebuilt dashboard backed by PostgreSQL and new data pipeline
+
+### Task 4.2 — FastAPI REST endpoints
 - [ ] API layer on top of PostgreSQL (player stats, predictions, model accuracy)
 - [ ] Proper request/response schemas with Pydantic
 
-### Task 4.2 — Automated weekly pipeline
+### Task 4.3 — Automated weekly pipeline
 - [ ] Cron job or scheduled task: fetch new data → features → predictions → DB
 - [ ] End-to-end automation
 
-### Task 4.3 — Docker containerization
+### Task 4.4 — Docker containerization
 - [ ] Dockerfile for app + PostgreSQL via docker-compose
 - [ ] One-command setup for anyone cloning the repo
 
