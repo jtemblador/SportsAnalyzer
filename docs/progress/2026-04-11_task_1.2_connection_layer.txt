@@ -1,25 +1,47 @@
 Task 1.2 — Database Connection Layer
 Date: 2026-04-11
 Status: Complete
-Tests: 3 new (204 total across project)
+Tests: 4 new (205 total across project)
 
 Goal
 -----
 Create reusable database connection functions that all future code will
 use — bulk loading, queries, feature engineering, and dashboard.
 
+Approach
+--------
+- Two functions: get_connection() for raw psycopg2 queries, get_engine()
+  for pandas to_sql/read_sql via SQLAlchemy.
+- SQLAlchemy engine is cached at module level to avoid creating multiple
+  connection pools on repeated calls (found during review).
+- Config loaded from .env via shared config.py module.
+
 Implementation
 --------------
 Created:
-- src/nfl/db/connection.py — get_connection() (psycopg2) and get_engine() (SQLAlchemy)
+- src/nfl/db/connection.py — get_connection() and get_engine()
 
 Modified:
-- src/nfl/db/__init__.py — convenience imports
-- requirements.txt — added psycopg2-binary, sqlalchemy, python-dotenv (removed duckdb, fastparquet)
-- tests/test_database.py — 3 new tests for connection layer
+- src/nfl/db/__init__.py — convenience imports (get_connection, get_engine, DB_CONFIG)
+- requirements.txt — added psycopg2-binary, sqlalchemy, python-dotenv (removed unused duckdb, fastparquet)
+- tests/test_database.py — 4 new tests for connection layer
 
 Usage:
   from src.nfl.db import get_connection, get_engine
 
-  conn = get_connection()   # raw SQL via psycopg2
-  engine = get_engine()     # pandas to_sql/read_sql via SQLAlchemy
+  conn = get_connection()   # raw SQL via psycopg2 (new connection each call)
+  engine = get_engine()     # pandas to_sql/read_sql via SQLAlchemy (cached)
+
+Validation
+----------
+- get_connection(): returns live connection, executes SELECT 1 successfully.
+- get_engine(): returns SQLAlchemy engine, pd.read_sql() works against nfl_predictions.
+- Engine caching: get_engine() called twice returns same object (is check).
+- Engine can read actual tables (even if empty).
+
+Lessons Learned
+---------------
+- SQLAlchemy's create_engine() creates a connection pool internally. Calling
+  it repeatedly would create multiple pools — fixed by caching at module level.
+- psycopg2 connections are NOT cached — they're meant to be short-lived
+  (open, query, close). New connection per call is the correct pattern.
