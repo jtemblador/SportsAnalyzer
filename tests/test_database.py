@@ -161,4 +161,9 @@ class TestConnectionLayer:
         engine = get_engine()
         result = pd.read_sql("SELECT count(*) as cnt FROM players", engine)
         assert result.iloc[0, 0] == 0
-        engine.dispose()
+
+    def test_get_engine_cached(self):
+        """Repeated calls return the same engine instance."""
+        engine1 = get_engine()
+        engine2 = get_engine()
+        assert engine1 is engine2
