@@ -3,16 +3,14 @@ Tests for the PostgreSQL database schema — verifies database exists,
 all tables are created, and column counts match expected values.
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import pytest
 import psycopg2
-
-
-DB_CONFIG = {
-    'dbname': 'nfl_predictions',
-    'user': 'j0e',
-    'password': 'nfl',
-    'host': 'localhost',
-}
+from src.nfl.db.config import DB_CONFIG
 
 # Expected column counts (Parquet columns + 1 for auto-generated id)
 EXPECTED_TABLES = {

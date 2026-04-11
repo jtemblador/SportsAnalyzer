@@ -243,6 +243,7 @@ Two ID formats exist across our datasets:
 ### Task 1.3 — Bulk load all Parquet data into PostgreSQL
 - [ ] Write `src/nfl/db/load_all.py` — reads every Parquet directory and loads into corresponding table
 - [ ] Load order: teams → players → games → all player-week tables → team_stats
+- [ ] Filter out `player_id IS NULL` rows when loading weekly_stats (22 garbage rows per season — no player_name, no position)
 - [ ] Handle duplicates gracefully (upsert or skip)
 - [ ] Print summary: row counts per table, any skipped/failed records
 - [ ] Verify total row counts match Parquet files (see DATA_CATALOG.md for expected counts)
