@@ -65,9 +65,9 @@ class TestPipelineMethods:
         assert hasattr(pipeline, 'fetch_latest')
         assert callable(pipeline.fetch_latest)
 
-    def test_fetch_all_player_stats_exists(self, pipeline):
-        assert hasattr(pipeline, 'fetch_all_player_stats')
-        assert callable(pipeline.fetch_all_player_stats)
+    def test_player_stats_fetcher_exists(self, pipeline):
+        assert hasattr(pipeline, 'player_stats_fetcher')
+        assert callable(pipeline.player_stats_fetcher.fetch_all)
 
 
 class TestDataDirectoriesPopulated:
