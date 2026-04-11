@@ -15,6 +15,7 @@ from src.nfl.data.fetch_nextgen_stats import NextGenStatsFetcher
 from src.nfl.data.fetch_ff_opportunity import FFOpportunityFetcher
 from src.nfl.data.fetch_pfr_advstats import PFRAdvStatsFetcher
 from src.nfl.data.fetch_team_stats import TeamStatsFetcher
+from src.nfl.data.fetch_depth_charts import DepthChartFetcher
 
 
 class NFLDataPipeline:
@@ -45,6 +46,7 @@ class NFLDataPipeline:
         self.ff_opportunity_fetcher = FFOpportunityFetcher(data_dir=f"{self.nfl_dir}/ff_opportunity")
         self.pfr_advstats_fetcher = PFRAdvStatsFetcher(data_dir=f"{self.nfl_dir}/pfr_advstats")
         self.team_stats_fetcher = TeamStatsFetcher(data_dir=f"{self.nfl_dir}/team_stats")
+        self.depth_chart_fetcher = DepthChartFetcher(data_dir=f"{self.nfl_dir}/depth_charts")
 
         print(f"✓ NFL Pipeline initialized")
         print(f"  Data will be stored in: {self.nfl_dir}")
@@ -321,8 +323,10 @@ class NFLDataPipeline:
         # 12. Team stats (team-level offensive/defensive EPA, yards, turnovers)
         self.team_stats_fetcher.fetch_all(start_season, end_season)
 
+        # 13. Depth charts (starter/backup status, 2018-2024 only)
+        self.depth_chart_fetcher.fetch_all(start_season, end_season)
+
         # Future fetchers will be added here as tasks are completed:
-        # 13. Depth charts (Task 0.12)
 
         print()
         print("=" * 60)

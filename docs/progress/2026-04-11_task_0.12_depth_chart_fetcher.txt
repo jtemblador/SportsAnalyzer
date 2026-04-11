@@ -1,0 +1,50 @@
+Task 0.12 — Depth Chart Fetcher (Starter/Backup Status)
+Date: 2026-04-11
+Status: Complete
+Tests: 16 new (140 total across project)
+
+Goal
+-----
+Pull weekly depth chart data from nflreadpy for seasons 2018-2024. This gives
+us starter/backup/third-string status per player per week — a direct signal
+for opportunity and expected workload.
+
+Approach
+--------
+- Used nfl.load_depth_charts() which returns 15 columns per player per week
+  including depth_team (1/2/3), formation (Offense/Defense/ST), and position.
+- One Parquet file per season: data/nfl/depth_charts/depth_charts_{season}.parquet
+- 2025 EXCLUDED — nflverse changed the schema entirely (12 cols, no week,
+  no depth_team, 554K rows vs ~37K). Fetcher caps at 2024 and logs a warning.
+- gsis_id is the join key (GSIS format, matches player_stats).
+
+Implementation
+--------------
+Created:
+- src/nfl/data/fetch_depth_charts.py — DepthChartFetcher class
+- data/nfl/depth_charts/ — 7 Parquet files (2018-2024), 258,942 total records
+- tests/test_fetch_depth_charts.py — 16 tests across 3 test classes
+
+Modified:
+- src/nfl/data/pipeline.py — registered DepthChartFetcher, added to fetch_all()
+
+Validation
+----------
+- 7 files created (2018-2024). All present.
+- Column count: 15 for all seasons. Consistent.
+- gsis_id: 0 nulls. Clean join key.
+- depth_team values: exactly '1', '2', '3'. No unexpected values.
+- formation values: Offense, Defense, Special Teams. Filter to Offense for fantasy.
+- Row counts: 36,168-37,780 per season. Reasonable.
+- 2025 correctly skipped with warning message.
+
+Lessons Learned
+---------------
+- nflverse completely changed the depth chart schema for 2025. New schema has
+  12 columns (dt, team, player_name, espn_id, gsis_id, pos_grp_id, pos_grp,
+  pos_id, pos_name, pos_abb, pos_slot, pos_rank) — no week column, no
+  depth_team, no formation. 554K rows vs ~37K. Likely a different data source.
+- depth_team is string type ('1', '2', '3'), not integer. Convert during
+  feature engineering if needed.
+- club_code is the team column (not 'team' like other datasets). Map during
+  feature engineering.

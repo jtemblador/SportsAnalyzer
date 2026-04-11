@@ -150,12 +150,12 @@ Every task follows the phase files in `.claude/instructions/`:
 - [x] **Note:** Replaces our manual opponent defense rank calculation with direct data
 
 ### Task 0.12 — Depth Charts
-- [ ] **Source:** `nfl.load_depth_charts(seasons)` — 15 columns
-- [ ] **Key data:** `depth_team` (1=starter, 2=backup, 3=third string), `depth_position`, `formation` (Offense/Defense/Special Teams), weekly per player
-- [ ] Create `src/nfl/data/fetch_depth_charts.py`
-- [ ] Fetch seasons 2018-2025, save to `data/nfl/depth_charts/depth_charts_{season}.parquet`
-- [ ] Verify: known starters should have `depth_team=1`, known backups `depth_team=2`
-- [ ] **Deliverable:** Weekly starter/backup status for all players, all seasons
+- [x] **Source:** `nfl.load_depth_charts(seasons)` — 15 columns
+- [x] **Key data:** `depth_team` (1=starter, 2=backup, 3=third string), `depth_position`, `formation` (Offense/Defense/Special Teams), weekly per player
+- [x] Create `src/nfl/data/fetch_depth_charts.py`
+- [x] Fetch seasons 2018-2024 (2025 schema incompatible), save to `data/nfl/depth_charts/depth_charts_{season}.parquet`
+- [x] Verify: known starters should have `depth_team=1`, known backups `depth_team=2`
+- [x] **Deliverable:** Weekly starter/backup status for all players, 2018-2024
 
 ### Task 0.13 — Unified data pipeline update
 - [ ] Update `NFLDataPipeline` in `src/nfl/data/pipeline.py` to orchestrate ALL fetch scripts
