@@ -1,0 +1,61 @@
+Task 0.14 — Player Stats Fetcher (Per-Season Organization)
+Date: 2026-04-11
+Status: Complete
+Tests: 18 new (179 total across project)
+
+Goal
+-----
+Re-fetch player stats as per-season files (8 files) instead of per-week files
+(144 files) to match all other dataset fetchers. Also captures playoff weeks
+(19-22) that the old per-week raw files were missing.
+
+Approach
+--------
+- Created PlayerStatsFetcher using nfl.load_player_stats([season]) which
+  returns all weeks (regular + playoffs) in one call.
+- One Parquet file per season: data/nfl/player_stats/player_stats_{season}.parquet
+- Replaces the inline fetch_all_player_stats() logic in pipeline.py with
+  a proper fetcher class registered like all others.
+- Old data/nfl/raw/ directory kept as backup until fully verified.
+
+Implementation
+--------------
+Created:
+- src/nfl/data/fetch_player_stats.py — PlayerStatsFetcher class
+- data/nfl/player_stats/ — 8 Parquet files (2018-2025), 147,223 total records
+- tests/test_fetch_player_stats.py — 18 tests across 4 test classes
+
+Modified:
+- src/nfl/data/pipeline.py — registered PlayerStatsFetcher, updated fetch_all()
+  and fetch_latest() to use new fetcher
+
+Validation
+----------
+- Data matching tests (critical):
+  - 2024 regular season: new file has exactly same rows as raw weekly files (18,128)
+  - 2024 total: new file has 18,981 rows vs raw 18,128 (853 extra = playoff weeks)
+  - Columns: 114 in both, zero missing columns
+  - Mahomes 2024 Week 1: fantasy_points_ppr and passing_yards match exactly
+  - 2020 and 2022: row counts also verified matching
+- New per-season files include playoff weeks 19-22 (previously missing from raw)
+- player_id: ~0.1% null (22/18,981 in 2024) — nflreadpy source data, acceptable
+- All 8 seasons fetched successfully
+
+Lessons Learned
+---------------
+- Old per-week raw files were missing playoff weeks (19-22) for every season.
+  The per-season fetch via load_player_stats([season]) captures everything.
+- player_id has a small number of nulls (~0.1%). These are likely team-level
+  aggregate rows or data gaps. Filter player_id.notna() during feature engineering.
+- data/nfl/raw/ (144 files) is now superseded by data/nfl/player_stats/ (8 files).
+  Keep raw/ as backup until PostgreSQL migration confirms data integrity.
+- 2026 data returns 404 from nflverse — data becomes available once the season
+  starts (September 2026). fetch_latest() will pick it up automatically.
+
+2026 Prediction Workflow
+------------------------
+When the 2026 NFL season starts:
+  1. python src/nfl/data/pipeline.py --latest   # pulls Week 1 data
+  2. Run feature engineering with Week 1 stats
+  3. Generate Week 2 predictions using trained model
+  4. Repeat weekly: fetch → features → predict → evaluate

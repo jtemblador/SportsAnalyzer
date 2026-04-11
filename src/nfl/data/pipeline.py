@@ -8,6 +8,7 @@ Orchestrates all dataset fetchers and stores data as Parquet files.
 import nflreadpy as nfl
 from pathlib import Path
 
+from src.nfl.data.fetch_player_stats import PlayerStatsFetcher
 from src.nfl.data.fetch_schedules import ScheduleFetcher
 from src.nfl.data.fetch_injuries import InjuryFetcher
 from src.nfl.data.fetch_snap_counts import SnapCountFetcher
@@ -39,6 +40,7 @@ class NFLDataPipeline:
         Path(self.raw_dir).mkdir(parents=True, exist_ok=True)
 
         # Initialize dataset fetchers
+        self.player_stats_fetcher = PlayerStatsFetcher(data_dir=f"{self.nfl_dir}/player_stats")
         self.schedule_fetcher = ScheduleFetcher(data_dir=f"{self.nfl_dir}/schedules")
         self.injury_fetcher = InjuryFetcher(data_dir=f"{self.nfl_dir}/injuries")
         self.snap_count_fetcher = SnapCountFetcher(data_dir=f"{self.nfl_dir}/snap_counts")
@@ -299,8 +301,8 @@ class NFLDataPipeline:
         print(f"Seasons: {start_season}-{end_season}")
         print()
 
-        # 1. Player stats (existing, per-week files)
-        self.fetch_all_player_stats(start_season, end_season)
+        # 1. Player stats (per-season files)
+        self.player_stats_fetcher.fetch_all(start_season, end_season)
 
         # 2. Schedules (Vegas lines, weather, game context)
         self.schedule_fetcher.fetch_all(start_season, end_season)
@@ -343,8 +345,8 @@ class NFLDataPipeline:
         print("=" * 60)
         print()
 
-        # Player stats — current season only
-        self.fetch_all_player_stats(start_season=season, end_season=season)
+        # Player stats — current season only (force re-fetch for latest weeks)
+        self.player_stats_fetcher.fetch_season(season, force=True)
 
         # All other datasets — re-fetch current season (force=True for season-level files)
         self.schedule_fetcher.fetch_season(season, force=True)
