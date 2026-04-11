@@ -1,0 +1,51 @@
+Task 1.1 — Database Setup and Schema
+Date: 2026-04-11
+Status: Complete
+Tests: 7 new (201 total across project)
+
+Goal
+-----
+Create the nfl_predictions PostgreSQL database with all 14 tables matching
+our 13 datasets + auto-generated ID column. Schema auto-generated from
+Parquet files to avoid hand-typing 600+ column definitions.
+
+Approach
+--------
+- PostgreSQL 15 already installed and running on the system.
+- Set password 'nfl' for user j0e.
+- Built generate_schema.py that reads each Parquet file, maps pandas dtypes
+  to PostgreSQL types (int32->INTEGER, float64->DOUBLE PRECISION, object->TEXT),
+  and outputs CREATE TABLE statements.
+- All column names quoted with double quotes to handle SQL reserved words.
+- Each table gets an auto-generated `id SERIAL PRIMARY KEY` column.
+- 16 indexes created for common query patterns.
+
+Implementation
+--------------
+Created:
+- src/nfl/db/__init__.py — empty package file
+- src/nfl/db/generate_schema.py — auto-generates schema from Parquet files
+- src/nfl/db/schema.sql — 737 lines, 14 tables, 16 indexes
+- tests/test_database.py — 7 tests (connection, tables, columns, indexes, empty)
+
+Tables Created:
+- players (40 cols), games (49), weekly_stats (115), injuries (17)
+- depth_charts (16), snap_counts (17), ngs_passing (30), ngs_rushing (23)
+- ngs_receiving (24), ff_opportunity (160), pfr_pass_advstats (25)
+- pfr_rush_advstats (17), pfr_rec_advstats (18), team_stats (103)
+
+Validation
+----------
+- All 14 tables exist in nfl_predictions database.
+- Column counts match: Parquet columns + 1 (id) for each table.
+- All 16 indexes created.
+- All tables empty (data loading is Task 1.3).
+- Connection works with password auth (user j0e, password nfl).
+
+Database Credentials
+--------------------
+- Host: localhost
+- Port: 5432
+- Database: nfl_predictions
+- User: j0e
+- Password: nfl

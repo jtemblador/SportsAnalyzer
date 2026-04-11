@@ -202,9 +202,9 @@ Two ID formats exist across our datasets:
 **Goal:** Get PostgreSQL running, schema designed around ALL datasets (see `docs/DATA_CATALOG.md`), data loaded.
 
 ### Task 1.1 — Database setup and schema
-- [ ] Install/configure PostgreSQL locally
-- [ ] Create `nfl_predictions` database
-- [ ] Design schema using DATA_CATALOG.md as the source of truth:
+- [x] Install/configure PostgreSQL locally
+- [x] Create `nfl_predictions` database
+- [x] Design schema using DATA_CATALOG.md as the source of truth:
   - **Reference tables** (loaded first):
     - `teams` — 32 NFL teams with abbreviations, names, conference, division
     - `players` — player reference with both GSIS + PFR IDs (from `load_players()`)
@@ -226,12 +226,12 @@ Two ID formats exist across our datasets:
     - `ff_opportunity` — from ff_opportunity: expected fantasy points (159 cols)
   - **Team-week tables:**
     - `team_stats` — from team_stats: team-level EPA, yards, turnovers (102 cols)
-- [ ] Add indexes for common query patterns:
+- [x] Add indexes for common query patterns:
   - Player lookup: `(player_gsis_id, season, week)`, `(player_pfr_id, season, week)`
   - Team lookup: `(team, season, week)`
   - Game lookup: `(season, week, home_team)`
-- [ ] Write schema migration script: `src/nfl/db/schema.sql`
-- [ ] **Deliverable:** Empty database with all tables + indexes created
+- [x] Write schema migration script: `src/nfl/db/schema.sql`
+- [x] **Deliverable:** Empty database with all tables + indexes created
 
 ### Task 1.2 — Database connection layer
 - [ ] Create `src/nfl/db/connection.py` — connection pooling, config from env vars
