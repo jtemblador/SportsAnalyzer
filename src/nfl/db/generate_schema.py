@@ -28,28 +28,29 @@ DTYPE_MAP = {
     'datetime64[ns]': 'TIMESTAMP',
 }
 
-# Table definitions: (table_name, parquet_path, unique_constraint_columns)
+# Table definitions: (table_name, data_dir, file_pattern_or_none, season_range, unique_constraint_columns)
+# Uses ALL season files to build the column union (handles cross-season column differences)
 TABLES = [
     # Reference tables (loaded first)
-    ('players', 'data/nfl/players/players.parquet', ['gsis_id']),
+    ('players', 'data/nfl/players', None, None, ['gsis_id']),
     # Game-level
-    ('games', 'data/nfl/schedules/schedules_2024.parquet', ['game_id']),
+    ('games', 'data/nfl/schedules', 'schedules_{}.parquet', range(2018, 2026), ['game_id']),
     # Player-week (GSIS ID)
-    ('weekly_stats', 'data/nfl/player_stats/player_stats_2024.parquet', ['player_id', 'season', 'week']),
-    ('injuries', 'data/nfl/injuries/injuries_2024.parquet', None),  # No unique — players can have multiple status updates per week
-    ('depth_charts', 'data/nfl/depth_charts/depth_charts_2024.parquet', None),
+    ('weekly_stats', 'data/nfl/player_stats', 'player_stats_{}.parquet', range(2018, 2026), ['player_id', 'season', 'week']),
+    ('injuries', 'data/nfl/injuries', 'injuries_{}.parquet', range(2018, 2026), None),
+    ('depth_charts', 'data/nfl/depth_charts', 'depth_charts_{}.parquet', range(2018, 2025), None),
     # Player-week (PFR ID)
-    ('snap_counts', 'data/nfl/snap_counts/snap_counts_2024.parquet', None),
-    ('pfr_pass_advstats', 'data/nfl/pfr_advstats/pfr_pass_2024.parquet', None),
-    ('pfr_rush_advstats', 'data/nfl/pfr_advstats/pfr_rush_2024.parquet', None),
-    ('pfr_rec_advstats', 'data/nfl/pfr_advstats/pfr_rec_2024.parquet', None),
+    ('snap_counts', 'data/nfl/snap_counts', 'snap_counts_{}.parquet', range(2018, 2026), None),
+    ('pfr_pass_advstats', 'data/nfl/pfr_advstats', 'pfr_pass_{}.parquet', range(2018, 2026), None),
+    ('pfr_rush_advstats', 'data/nfl/pfr_advstats', 'pfr_rush_{}.parquet', range(2018, 2026), None),
+    ('pfr_rec_advstats', 'data/nfl/pfr_advstats', 'pfr_rec_{}.parquet', range(2018, 2026), None),
     # Player-week (GSIS ID, qualified players)
-    ('ngs_passing', 'data/nfl/nextgen_stats/ngs_passing_2024.parquet', None),
-    ('ngs_rushing', 'data/nfl/nextgen_stats/ngs_rushing_2024.parquet', None),
-    ('ngs_receiving', 'data/nfl/nextgen_stats/ngs_receiving_2024.parquet', None),
-    ('ff_opportunity', 'data/nfl/ff_opportunity/ff_opportunity_2024.parquet', None),
+    ('ngs_passing', 'data/nfl/nextgen_stats', 'ngs_passing_{}.parquet', range(2018, 2026), None),
+    ('ngs_rushing', 'data/nfl/nextgen_stats', 'ngs_rushing_{}.parquet', range(2018, 2026), None),
+    ('ngs_receiving', 'data/nfl/nextgen_stats', 'ngs_receiving_{}.parquet', range(2018, 2026), None),
+    ('ff_opportunity', 'data/nfl/ff_opportunity', 'ff_opportunity_{}.parquet', range(2018, 2026), None),
     # Team-week
-    ('team_stats', 'data/nfl/team_stats/team_stats_2024.parquet', ['team', 'season', 'week']),
+    ('team_stats', 'data/nfl/team_stats', 'team_stats_{}.parquet', range(2018, 2026), ['team', 'season', 'week']),
 ]
 
 # Indexes to create after tables
@@ -116,24 +117,48 @@ def generate_create_table(table_name, df, unique_cols=None):
     return '\n'.join(lines)
 
 
+def load_union_df(data_dir, file_pattern, seasons):
+    """Load all season files and return a DataFrame with the union of all columns."""
+    full_dir = ROOT / data_dir
+
+    if file_pattern is None:
+        # Single file (e.g., players.parquet)
+        single_file = full_dir / f"{full_dir.name}.parquet"
+        if single_file.exists():
+            return pd.read_parquet(single_file)
+        return None
+
+    # Load all seasons, concat to get union of columns
+    dfs = []
+    for season in seasons:
+        filepath = full_dir / file_pattern.format(season)
+        if filepath.exists():
+            dfs.append(pd.read_parquet(filepath).head(1))  # Only need schema, not full data
+
+    if not dfs:
+        return None
+
+    return pd.concat(dfs, ignore_index=True)
+
+
 def generate_schema():
     """Generate the complete schema.sql file."""
     output = []
     output.append('-- NFL Predictions Database Schema')
     output.append('-- Auto-generated from Parquet files by generate_schema.py')
+    output.append('-- Uses column union across all seasons to handle schema differences')
     output.append('-- Re-run to regenerate: python src/nfl/db/generate_schema.py')
     output.append('')
 
     # Generate CREATE TABLE for each dataset
-    for table_name, parquet_path, unique_cols in TABLES:
-        full_path = ROOT / parquet_path
-        if not full_path.exists():
-            print(f"  WARNING: {parquet_path} not found, skipping {table_name}")
+    for table_name, data_dir, file_pattern, seasons, unique_cols in TABLES:
+        df = load_union_df(data_dir, file_pattern, seasons)
+        if df is None:
+            print(f"  WARNING: no data found for {table_name}, skipping")
             continue
 
-        df = pd.read_parquet(full_path)
         sql = generate_create_table(table_name, df, unique_cols)
-        output.append(f'-- {table_name}: {len(df.columns)} columns from {parquet_path}')
+        output.append(f'-- {table_name}: {len(df.columns)} columns from {data_dir}/')
         output.append(sql)
         output.append('')
         print(f"  {table_name}: {len(df.columns)} columns")

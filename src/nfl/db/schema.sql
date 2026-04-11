@@ -1,8 +1,9 @@
 -- NFL Predictions Database Schema
 -- Auto-generated from Parquet files by generate_schema.py
+-- Uses column union across all seasons to handle schema differences
 -- Re-run to regenerate: python src/nfl/db/generate_schema.py
 
--- players: 39 columns from data/nfl/players/players.parquet
+-- players: 39 columns from data/nfl/players/
 CREATE TABLE IF NOT EXISTS players (
     id SERIAL PRIMARY KEY,
     "gsis_id" TEXT,
@@ -47,7 +48,7 @@ CREATE TABLE IF NOT EXISTS players (
     UNIQUE ("gsis_id")
 );
 
--- games: 48 columns from data/nfl/schedules/schedules_2024.parquet
+-- games: 48 columns from data/nfl/schedules/
 CREATE TABLE IF NOT EXISTS games (
     id SERIAL PRIMARY KEY,
     "game_id" TEXT,
@@ -101,7 +102,7 @@ CREATE TABLE IF NOT EXISTS games (
     UNIQUE ("game_id")
 );
 
--- weekly_stats: 114 columns from data/nfl/player_stats/player_stats_2024.parquet
+-- weekly_stats: 115 columns from data/nfl/player_stats/
 CREATE TABLE IF NOT EXISTS weekly_stats (
     id SERIAL PRIMARY KEY,
     "player_id" TEXT,
@@ -218,16 +219,17 @@ CREATE TABLE IF NOT EXISTS weekly_stats (
     "gwfg_distance" INTEGER,
     "fantasy_points" DOUBLE PRECISION,
     "fantasy_points_ppr" DOUBLE PRECISION,
+    "game_id" TEXT,
     UNIQUE ("player_id", "season", "week")
 );
 
--- injuries: 16 columns from data/nfl/injuries/injuries_2024.parquet
+-- injuries: 17 columns from data/nfl/injuries/
 CREATE TABLE IF NOT EXISTS injuries (
     id SERIAL PRIMARY KEY,
-    "season" INTEGER,
+    "season" DOUBLE PRECISION,
     "game_type" TEXT,
     "team" TEXT,
-    "week" INTEGER,
+    "week" DOUBLE PRECISION,
     "gsis_id" TEXT,
     "position" TEXT,
     "full_name" TEXT,
@@ -239,10 +241,11 @@ CREATE TABLE IF NOT EXISTS injuries (
     "practice_primary_injury" TEXT,
     "practice_secondary_injury" TEXT,
     "practice_status" TEXT,
-    "date_modified" TIMESTAMPTZ
+    "date_modified" TIMESTAMPTZ,
+    "season_type" TEXT
 );
 
--- depth_charts: 15 columns from data/nfl/depth_charts/depth_charts_2024.parquet
+-- depth_charts: 15 columns from data/nfl/depth_charts/
 CREATE TABLE IF NOT EXISTS depth_charts (
     id SERIAL PRIMARY KEY,
     "season" INTEGER,
@@ -262,7 +265,7 @@ CREATE TABLE IF NOT EXISTS depth_charts (
     "full_name" TEXT
 );
 
--- snap_counts: 16 columns from data/nfl/snap_counts/snap_counts_2024.parquet
+-- snap_counts: 16 columns from data/nfl/snap_counts/
 CREATE TABLE IF NOT EXISTS snap_counts (
     id SERIAL PRIMARY KEY,
     "game_id" TEXT,
@@ -283,7 +286,7 @@ CREATE TABLE IF NOT EXISTS snap_counts (
     "st_pct" DOUBLE PRECISION
 );
 
--- pfr_pass_advstats: 24 columns from data/nfl/pfr_advstats/pfr_pass_2024.parquet
+-- pfr_pass_advstats: 24 columns from data/nfl/pfr_advstats/
 CREATE TABLE IF NOT EXISTS pfr_pass_advstats (
     id SERIAL PRIMARY KEY,
     "game_id" TEXT,
@@ -312,7 +315,7 @@ CREATE TABLE IF NOT EXISTS pfr_pass_advstats (
     "def_times_hitqb" DOUBLE PRECISION
 );
 
--- pfr_rush_advstats: 16 columns from data/nfl/pfr_advstats/pfr_rush_2024.parquet
+-- pfr_rush_advstats: 16 columns from data/nfl/pfr_advstats/
 CREATE TABLE IF NOT EXISTS pfr_rush_advstats (
     id SERIAL PRIMARY KEY,
     "game_id" TEXT,
@@ -333,7 +336,7 @@ CREATE TABLE IF NOT EXISTS pfr_rush_advstats (
     "receiving_broken_tackles" DOUBLE PRECISION
 );
 
--- pfr_rec_advstats: 17 columns from data/nfl/pfr_advstats/pfr_rec_2024.parquet
+-- pfr_rec_advstats: 17 columns from data/nfl/pfr_advstats/
 CREATE TABLE IF NOT EXISTS pfr_rec_advstats (
     id SERIAL PRIMARY KEY,
     "game_id" TEXT,
@@ -355,7 +358,7 @@ CREATE TABLE IF NOT EXISTS pfr_rec_advstats (
     "receiving_rat" DOUBLE PRECISION
 );
 
--- ngs_passing: 29 columns from data/nfl/nextgen_stats/ngs_passing_2024.parquet
+-- ngs_passing: 29 columns from data/nfl/nextgen_stats/
 CREATE TABLE IF NOT EXISTS ngs_passing (
     id SERIAL PRIMARY KEY,
     "season" INTEGER,
@@ -389,7 +392,7 @@ CREATE TABLE IF NOT EXISTS ngs_passing (
     "player_short_name" TEXT
 );
 
--- ngs_rushing: 22 columns from data/nfl/nextgen_stats/ngs_rushing_2024.parquet
+-- ngs_rushing: 22 columns from data/nfl/nextgen_stats/
 CREATE TABLE IF NOT EXISTS ngs_rushing (
     id SERIAL PRIMARY KEY,
     "season" INTEGER,
@@ -416,7 +419,7 @@ CREATE TABLE IF NOT EXISTS ngs_rushing (
     "rush_pct_over_expected" DOUBLE PRECISION
 );
 
--- ngs_receiving: 23 columns from data/nfl/nextgen_stats/ngs_receiving_2024.parquet
+-- ngs_receiving: 23 columns from data/nfl/nextgen_stats/
 CREATE TABLE IF NOT EXISTS ngs_receiving (
     id SERIAL PRIMARY KEY,
     "season" INTEGER,
@@ -444,7 +447,7 @@ CREATE TABLE IF NOT EXISTS ngs_receiving (
     "player_short_name" TEXT
 );
 
--- ff_opportunity: 159 columns from data/nfl/ff_opportunity/ff_opportunity_2024.parquet
+-- ff_opportunity: 159 columns from data/nfl/ff_opportunity/
 CREATE TABLE IF NOT EXISTS ff_opportunity (
     id SERIAL PRIMARY KEY,
     "season" TEXT,
@@ -608,7 +611,7 @@ CREATE TABLE IF NOT EXISTS ff_opportunity (
     "total_fantasy_points_diff_team" DOUBLE PRECISION
 );
 
--- team_stats: 102 columns from data/nfl/team_stats/team_stats_2024.parquet
+-- team_stats: 103 columns from data/nfl/team_stats/
 CREATE TABLE IF NOT EXISTS team_stats (
     id SERIAL PRIMARY KEY,
     "season" INTEGER,
@@ -713,6 +716,7 @@ CREATE TABLE IF NOT EXISTS team_stats (
     "gwfg_missed" INTEGER,
     "gwfg_blocked" INTEGER,
     "gwfg_distance" INTEGER,
+    "game_id" TEXT,
     UNIQUE ("team", "season", "week")
 );
 

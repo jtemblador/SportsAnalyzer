@@ -1,0 +1,71 @@
+Task 1.3 — Bulk Load All Parquet Data into PostgreSQL
+Date: 2026-04-11
+Status: Complete
+Tests: 14 total in test_database.py (rewritten for post-load state)
+
+Goal
+-----
+Load all 14 Parquet datasets into PostgreSQL so historical data (2018-2025)
+is queryable via SQL. 798,176 rows across 14 tables.
+
+Approach
+--------
+- Built load_all.py with declarative TABLES config — each entry defines
+  table name, data directory, file pattern, season range, and optional filter.
+- Uses pandas to_sql() with method='multi' and chunksize=5000 for batch inserts.
+- Auto-truncates existing data if tables are non-empty (idempotent reloads).
+- Filters null player_id garbage rows from weekly_stats (173 rows removed).
+
+Key Issue Discovered: Cross-Season Column Mismatches
+----------------------------------------------------
+The schema generator originally used a single season's Parquet to define columns.
+Three datasets have columns that only appear in certain seasons:
+- player_stats: 'game_id' only in 2022, 2023, 2025 (not 2018-2021, 2024)
+- injuries: 'season_type' only in 2025 (not 2018-2024)
+- team_stats: 'game_id' only in 2022, 2023, 2025
+
+Fixed by updating generate_schema.py to load ALL season files and take the
+column union. Schema now includes every column from any season.
+
+Implementation
+--------------
+Created:
+- src/nfl/db/load_all.py — bulk loader with declarative table config
+
+Modified:
+- src/nfl/db/generate_schema.py — now uses column union across all seasons
+- src/nfl/db/schema.sql — regenerated with union columns (weekly_stats 116,
+  injuries 18, team_stats 104)
+- tests/test_database.py — rewritten for post-load state (row counts,
+  data queries, cross-dataset joins)
+
+Validation
+----------
+- All 14 tables loaded with correct row counts (verified in tests).
+- 173 null player_id rows filtered from weekly_stats (0 remain in DB).
+- Third-party verification against NFL.com box scores:
+  - Mahomes 2024 W1: 20/28, 291 yds, 1 TD, 1 INT — matches
+  - Josh Allen 2024 W1: 18/23, 232 yds, 2 TD — matches
+  - Lamar Jackson 2024 W1: 26/41, 273 yds, 122 rush yds — matches
+  - Saquon Barkley 2024 W1: 24 car, 109 yds, 2 TD — matches
+  - Ja'Marr Chase 2024 W1: 6 rec, 62 yds — matches
+  - Travis Kelce 2024 W1: 3 rec, 34 yds — matches
+- Cross-dataset joins verified:
+  - weekly_stats + games: spread_line and total_line returned correctly
+  - injuries: Mahomes W18 Doubtful/Ankle — correct
+  - snap_counts: Barkley 80% offense snaps — correct for starter
+  - ngs_passing: Mahomes 2.72s time to throw — reasonable
+  - players: GSIS↔PFR ID mapping confirmed for Mahomes
+
+Lessons Learned
+---------------
+- Cross-season column differences are a real problem. Always generate schemas
+  from the union of ALL seasons, not a single representative year. nflverse
+  adds new columns over time (game_id added ~2022, season_type added 2025).
+- pandas to_sql() with method='multi' handles missing columns gracefully —
+  seasons without a column just have NULL in those rows.
+- Bulk load takes ~10 minutes for 798K rows. Acceptable for a one-time load.
+  Incremental updates (Task 1.4) will be much faster.
+- Tyler Bass (K) shows 0 fantasy_points_ppr despite 2 FG + 4 XP — this is
+  because nflreadpy's fantasy_points_ppr uses standard scoring which doesn't
+  count kicker points. Kicker scoring is separate. Not a bug.
