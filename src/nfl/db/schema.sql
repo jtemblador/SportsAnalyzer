@@ -239,8 +239,7 @@ CREATE TABLE IF NOT EXISTS injuries (
     "practice_primary_injury" TEXT,
     "practice_secondary_injury" TEXT,
     "practice_status" TEXT,
-    "date_modified" TIMESTAMPTZ,
-    UNIQUE ("gsis_id", "season", "week")
+    "date_modified" TIMESTAMPTZ
 );
 
 -- depth_charts: 15 columns from data/nfl/depth_charts/depth_charts_2024.parquet

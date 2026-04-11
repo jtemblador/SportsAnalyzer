@@ -36,7 +36,7 @@ TABLES = [
     ('games', 'data/nfl/schedules/schedules_2024.parquet', ['game_id']),
     # Player-week (GSIS ID)
     ('weekly_stats', 'data/nfl/player_stats/player_stats_2024.parquet', ['player_id', 'season', 'week']),
-    ('injuries', 'data/nfl/injuries/injuries_2024.parquet', ['gsis_id', 'season', 'week']),
+    ('injuries', 'data/nfl/injuries/injuries_2024.parquet', None),  # No unique — players can have multiple status updates per week
     ('depth_charts', 'data/nfl/depth_charts/depth_charts_2024.parquet', None),
     # Player-week (PFR ID)
     ('snap_counts', 'data/nfl/snap_counts/snap_counts_2024.parquet', None),
