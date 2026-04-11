@@ -14,6 +14,7 @@ from src.nfl.data.fetch_snap_counts import SnapCountFetcher
 from src.nfl.data.fetch_nextgen_stats import NextGenStatsFetcher
 from src.nfl.data.fetch_ff_opportunity import FFOpportunityFetcher
 from src.nfl.data.fetch_pfr_advstats import PFRAdvStatsFetcher
+from src.nfl.data.fetch_team_stats import TeamStatsFetcher
 
 
 class NFLDataPipeline:
@@ -43,6 +44,7 @@ class NFLDataPipeline:
         self.nextgen_stats_fetcher = NextGenStatsFetcher(data_dir=f"{self.nfl_dir}/nextgen_stats")
         self.ff_opportunity_fetcher = FFOpportunityFetcher(data_dir=f"{self.nfl_dir}/ff_opportunity")
         self.pfr_advstats_fetcher = PFRAdvStatsFetcher(data_dir=f"{self.nfl_dir}/pfr_advstats")
+        self.team_stats_fetcher = TeamStatsFetcher(data_dir=f"{self.nfl_dir}/team_stats")
 
         print(f"✓ NFL Pipeline initialized")
         print(f"  Data will be stored in: {self.nfl_dir}")
@@ -316,8 +318,10 @@ class NFLDataPipeline:
         # 9-11. PFR Advanced Stats (pass, rush, rec)
         self.pfr_advstats_fetcher.fetch_all(start_season, end_season)
 
+        # 12. Team stats (team-level offensive/defensive EPA, yards, turnovers)
+        self.team_stats_fetcher.fetch_all(start_season, end_season)
+
         # Future fetchers will be added here as tasks are completed:
-        # 12. Team stats (Task 0.11)
         # 13. Depth charts (Task 0.12)
 
         print()

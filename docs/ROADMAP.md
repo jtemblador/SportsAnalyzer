@@ -141,13 +141,13 @@ Every task follows the phase files in `.claude/instructions/`:
 - [x] **Deliverable:** WR/TE reliability and target quality metrics for all seasons
 
 ### Task 0.11 — Team Stats
-- [ ] **Source:** `nfl.load_team_stats(seasons)` — 102 columns
-- [ ] **Key data:** Team-level per-week totals — offensive/defensive EPA, yards, TDs, turnovers, all split by pass/rush/receive
-- [ ] Create `src/nfl/data/fetch_team_stats.py`
-- [ ] Fetch seasons 2018-2025, save to `data/nfl/team_stats/team_stats_{season}.parquet`
-- [ ] Verify: top offenses should have positive total EPA, bottom defenses should allow high yards
-- [ ] **Deliverable:** Team offensive and defensive quality metrics for all seasons
-- [ ] **Note:** Replaces our manual opponent defense rank calculation with direct data
+- [x] **Source:** `nfl.load_team_stats(seasons)` — 102 columns
+- [x] **Key data:** Team-level per-week totals — offensive/defensive EPA, yards, TDs, turnovers, all split by pass/rush/receive
+- [x] Create `src/nfl/data/fetch_team_stats.py`
+- [x] Fetch seasons 2018-2025, save to `data/nfl/team_stats/team_stats_{season}.parquet`
+- [x] Verify: top offenses should have positive total EPA, bottom defenses should allow high yards
+- [x] **Deliverable:** Team offensive and defensive quality metrics for all seasons
+- [x] **Note:** Replaces our manual opponent defense rank calculation with direct data
 
 ### Task 0.12 — Depth Charts
 - [ ] **Source:** `nfl.load_depth_charts(seasons)` — 15 columns

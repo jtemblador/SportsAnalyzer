@@ -1,0 +1,42 @@
+Task 0.11 — Team Stats Fetcher (Team-Level Weekly EPA, Yards, Turnovers)
+Date: 2026-04-11
+Status: Complete
+Tests: 13 new (124 total across project)
+
+Goal
+-----
+Pull weekly team-level stats from nflreadpy for seasons 2018-2025. This gives
+us team offensive/defensive EPA, yards, TDs, and turnovers per week — replacing
+our manual opponent defense rank calculation with direct data.
+
+Approach
+--------
+- Used nfl.load_team_stats() which returns 102-103 columns per team per week.
+- One Parquet file per season: data/nfl/team_stats/team_stats_{season}.parquet
+- Join key: team + season + week (team abbreviation format matches player_stats).
+
+Implementation
+--------------
+Created:
+- src/nfl/data/fetch_team_stats.py — TeamStatsFetcher class
+- data/nfl/team_stats/ — 8 Parquet files (2018-2025), 4,454 total records
+- tests/test_fetch_team_stats.py — 13 tests across 3 test classes
+
+Modified:
+- src/nfl/data/pipeline.py — registered TeamStatsFetcher, added to fetch_all()
+
+Validation
+----------
+- All 32 teams present in every season. Correct.
+- team column: 0 nulls.
+- Column counts: 102-103 (minor schema change in some seasons). Stored as-is.
+- Row counts: 534-570 per season (32 teams x ~17-18 weeks). Reasonable.
+- All 8 seasons fetched.
+
+Lessons Learned
+---------------
+- Column count varies slightly: 102 for most seasons, 103 for 2022/2023/2025.
+  This is a minor nflverse schema evolution. Parquet handles it fine since
+  each file is self-contained.
+- No opponent column in team_stats — to get opponent defense stats, join with
+  schedules via team + season + week. Handle during feature engineering.
