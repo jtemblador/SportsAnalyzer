@@ -5,12 +5,15 @@ NFL data fetching and storing pipeline using nflreadpy.
 Orchestrates all dataset fetchers and stores data as Parquet files.
 
 Usage:
-    python src/nfl/data/pipeline.py           # Fetch all datasets 2018-2025
-    python src/nfl/data/pipeline.py --latest  # Fetch current season only
+    python src/nfl/data/pipeline.py                      # Fetch all datasets 2018-2025
+    python src/nfl/data/pipeline.py --latest              # Fetch current season only
+    python src/nfl/data/pipeline.py --refresh-db          # Fetch all + reload PostgreSQL
+    python src/nfl/data/pipeline.py --latest --refresh-db # Fetch latest + reload PostgreSQL
 """
 
 import nflreadpy as nfl
 
+from src.nfl.db.load_all import load_all as db_load_all
 from src.nfl.data.fetch_players import PlayersFetcher
 from src.nfl.data.fetch_player_stats import PlayerStatsFetcher
 from src.nfl.data.fetch_schedules import ScheduleFetcher
@@ -62,7 +65,19 @@ class NFLDataPipeline:
         """Get the current NFL season year."""
         return nfl.get_current_season()
 
-    def fetch_all(self, start_season=2018, end_season=None):
+    def refresh_db(self):
+        """
+        Reload all Parquet data into PostgreSQL.
+        Truncates existing data and reloads from Parquet files (idempotent).
+        """
+        print()
+        print("=" * 60)
+        print("REFRESHING DATABASE FROM PARQUET FILES")
+        print("=" * 60)
+        results = db_load_all()
+        return results
+
+    def fetch_all(self, start_season=2018, end_season=None, refresh_db=False):
         """
         Fetch ALL datasets for the given season range.
         Each fetcher skips data that already exists on disk.
@@ -70,6 +85,7 @@ class NFLDataPipeline:
         Args:
             start_season: First season to fetch (default: 2018 for warm-up data)
             end_season: Last season to fetch (default: current season)
+            refresh_db: If True, reload all data into PostgreSQL after fetching
         """
         if end_season is None:
             end_season = self.get_current_season()
@@ -115,7 +131,10 @@ class NFLDataPipeline:
         print("All datasets up to date!")
         print("=" * 60)
 
-    def fetch_latest(self):
+        if refresh_db:
+            self.refresh_db()
+
+    def fetch_latest(self, refresh_db=False):
         """
         Fetch only the current season across all datasets.
         Use this during a live season to pull the latest week's data.
@@ -150,14 +169,20 @@ class NFLDataPipeline:
         print(f"{season} season data up to date!")
         print("=" * 60)
 
+        if refresh_db:
+            self.refresh_db()
+
 
 # Allow this file to be run independently
 if __name__ == "__main__":
     import sys
 
-    if '--latest' in sys.argv:
-        pipeline = NFLDataPipeline()
-        pipeline.fetch_latest()
+    args = sys.argv[1:]
+    do_refresh = '--refresh-db' in args
+
+    pipeline = NFLDataPipeline()
+
+    if '--latest' in args:
+        pipeline.fetch_latest(refresh_db=do_refresh)
     else:
-        pipeline = NFLDataPipeline()
-        pipeline.fetch_all()
+        pipeline.fetch_all(refresh_db=do_refresh)

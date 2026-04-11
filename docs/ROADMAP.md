@@ -251,11 +251,11 @@ Two ID formats exist across our datasets:
 - [x] **Deliverable:** 798,176 rows across 14 tables, all queryable in PostgreSQL
 
 ### Task 1.4 — Database refresh after fetch
-- [ ] Add `refresh_db()` method to pipeline that calls `load_all()` after `fetch_all()` or `fetch_latest()`
-- [ ] Update `__main__` to support `--refresh-db` flag: fetch new data then reload DB
-- [ ] Test: run with `--latest --refresh-db` and verify new data appears in both Parquet and DB
-- [ ] **Deliverable:** `python src/nfl/data/pipeline.py --latest --refresh-db` keeps both in sync
-- [ ] **Note:** Simpler than true dual-write (modifying 10 fetcher classes). Full reload takes ~10 min but is idempotent and reliable.
+- [x] Add `refresh_db()` method to pipeline that calls `load_all()` after `fetch_all()` or `fetch_latest()`
+- [x] Update `__main__` to support `--refresh-db` flag: fetch new data then reload DB
+- [x] Test: run with `--latest --refresh-db` and verify new data appears in both Parquet and DB
+- [x] **Deliverable:** `python src/nfl/data/pipeline.py --latest --refresh-db` keeps both in sync
+- [x] **Note:** Simpler than true dual-write (modifying 10 fetcher classes). Full reload takes ~10 min but is idempotent and reliable.
 
 ### Task 1.5 — Legacy data cleanup
 - [ ] Delete `data/nfl/raw/` (144 per-week files, replaced by `data/nfl/player_stats/`)

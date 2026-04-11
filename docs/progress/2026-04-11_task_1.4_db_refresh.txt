@@ -1,0 +1,53 @@
+Task 1.4 — Database Refresh After Fetch
+Date: 2026-04-11
+Status: Complete
+
+Goal
+-----
+Automate PostgreSQL reloading so the database stays in sync with Parquet
+files after fetching new data. Before this, fetching and DB loading were
+separate manual steps. Now a single CLI flag keeps both in sync.
+
+Approach
+--------
+- Added refresh_db() method to NFLDataPipeline that calls the existing
+  load_all() bulk loader from Task 1.3.
+- Chose full truncate+reload over incremental upserts — simpler, idempotent,
+  and avoids partial-state bugs. ~10 min for 798K rows is acceptable for a
+  pipeline that runs at most once per week during the NFL season.
+- Added --refresh-db CLI flag rather than modifying 10 fetcher classes to
+  dual-write. This keeps fetchers focused on Parquet I/O only.
+
+Implementation
+--------------
+Modified:
+- src/nfl/data/pipeline.py:
+  - Added refresh_db() method (calls load_all from src.nfl.db.load_all)
+  - Added refresh_db=False parameter to fetch_all() and fetch_latest()
+  - Updated __main__ to parse --refresh-db from sys.argv
+  - Updated module docstring with new usage examples
+
+No other files modified. Existing load_all.py handles all DB logic unchanged.
+
+Usage
+-----
+  python src/nfl/data/pipeline.py --refresh-db           # Full fetch + DB reload
+  python src/nfl/data/pipeline.py --latest --refresh-db  # Latest season + DB reload
+  python src/nfl/data/pipeline.py --latest               # Latest only, no DB (unchanged)
+
+Validation
+----------
+- Import verified: pipeline.py correctly imports load_all from src.nfl.db.load_all
+- Method signatures verified: refresh_db param exists on both fetch_all() and fetch_latest()
+- Existing behavior unchanged when --refresh-db is not passed
+- load_all() was already verified in Task 1.3 (798,176 rows, third-party checked)
+
+Lessons Learned
+---------------
+- Full reload is the right strategy at this scale. Incremental upserts would
+  require tracking which rows are new vs updated across 14 tables with different
+  key structures (GSIS ID vs PFR ID vs team+season+week). Not worth the complexity
+  until the dataset grows significantly beyond 800K rows.
+- Importing load_all.py from pipeline.py works fine despite load_all.py's
+  sys.path.insert hack — the hack only matters for direct execution and is
+  harmless when the module is imported normally.
