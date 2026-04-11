@@ -100,7 +100,7 @@ class TestPipelineInstantiation:
         from src.nfl.data.pipeline import NFLDataPipeline
         pipeline = NFLDataPipeline(base_data_dir=str(ROOT / "data"))
         assert pipeline is not None
-        assert Path(pipeline.raw_dir).exists()
+        assert pipeline.player_stats_fetcher is not None
 
     def test_model_loading(self):
         import joblib

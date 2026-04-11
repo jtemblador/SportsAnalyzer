@@ -10,7 +10,6 @@ Usage:
 """
 
 import nflreadpy as nfl
-from pathlib import Path
 
 from src.nfl.data.fetch_players import PlayersFetcher
 from src.nfl.data.fetch_player_stats import PlayerStatsFetcher
@@ -39,10 +38,6 @@ class NFLDataPipeline:
         """
         # Set up paths for NFL data storage
         self.nfl_dir = f"{base_data_dir}/nfl"
-        self.raw_dir = f"{self.nfl_dir}/raw"
-
-        # Create directories if they don't exist
-        Path(self.raw_dir).mkdir(parents=True, exist_ok=True)
 
         # Initialize dataset fetchers
         self.players_fetcher = PlayersFetcher(data_dir=f"{self.nfl_dir}/players")
@@ -66,55 +61,6 @@ class NFLDataPipeline:
     def get_current_season(self):
         """Get the current NFL season year."""
         return nfl.get_current_season()
-
-    # ===== LEGACY METHODS =====
-    # Used by app.py (Streamlit dashboard) which still reads from data/nfl/raw/.
-    # TODO: Remove these once app.py is migrated to read from per-season files
-    #       or PostgreSQL (Task 2.3).
-
-    def get_last_downloaded_week(self):
-        """LEGACY: Scans data/nfl/raw/ for per-week files. Used by app.py."""
-        parquet_files = list(Path(self.raw_dir).glob("player_stats_*.parquet"))
-        if not parquet_files:
-            return (2024, 18)
-        max_season = 0
-        max_week = 0
-        for file in parquet_files:
-            parts = file.stem.split('_')
-            if len(parts) >= 4:
-                try:
-                    season = int(parts[2])
-                    week = int(parts[4])
-                    if season > max_season or (season == max_season and week > max_week):
-                        max_season = season
-                        max_week = week
-                except ValueError:
-                    continue
-        return (max_season, max_week)
-
-    def check_file_exists(self, season, week):
-        """LEGACY: Checks per-week file in data/nfl/raw/. Used by app.py."""
-        filename = f"player_stats_{season}_week_{week}.parquet"
-        return Path(f"{self.raw_dir}/{filename}").exists()
-
-    def run_pipeline(self, season, week, silent_check=False):
-        """LEGACY: Per-week fetch + save to data/nfl/raw/. Used by app.py."""
-        if self.check_file_exists(season, week):
-            if not silent_check:
-                print(f"Data for Season {season}, Week {week} already exists. Skipping...")
-            return None
-        print(f"Fetching Season {season}, Week {week}...")
-        player_stats = nfl.load_player_stats([season]).to_pandas()
-        player_stats = player_stats[player_stats['week'] == week]
-        if len(player_stats) == 0:
-            print(f"No data available - week hasn't started yet")
-            return None
-        filename = f"player_stats_{season}_week_{week}.parquet"
-        player_stats.to_parquet(f"{self.raw_dir}/{filename}", index=False)
-        print(f"Saved {len(player_stats):,} records")
-        return player_stats
-
-    # ===== END LEGACY METHODS =====
 
     def fetch_all(self, start_season=2018, end_season=None):
         """

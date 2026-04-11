@@ -284,11 +284,14 @@ Two ID formats exist across our datasets:
 - [ ] Benchmark: DB reads should be faster for cross-week queries
 - [ ] **Deliverable:** Feature engineering can run against PostgreSQL
 
-### Task 2.3 — Dashboard reads from DB
-- [ ] Modify `app.py` to query PostgreSQL instead of loading Parquet files
+### Task 2.3 — Dashboard rebuild (new app.py)
+- [ ] Rebuild `app.py` from scratch — old version uses legacy per-week raw files and is now broken
+- [ ] Use old `app.py` as a reference for layout and features, not as a starting point
+- [ ] Read data from PostgreSQL (with per-season Parquet fallback)
+- [ ] Tabs: Player Explorer, Performance Trends, Predictions, Model Accuracy
+- [ ] Use all new datasets: show injuries, snap counts, NGS metrics, expected fantasy points
 - [ ] Streamlit filters translate to SQL WHERE clauses
-- [ ] Fallback to Parquet if DB connection fails
-- [ ] **Deliverable:** Dashboard works identically but backed by PostgreSQL
+- [ ] **Deliverable:** Fully rebuilt dashboard backed by PostgreSQL and new data pipeline
 
 ### Task 2.4 — Load predictions and model runs into DB
 - [ ] Create `predictions` and `model_runs` tables
