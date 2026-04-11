@@ -103,13 +103,13 @@ Every task follows the phase files in `.claude/instructions/`:
 - [x] **Deliverable:** WR/TE-level Next Gen receiving metrics for all seasons
 
 ### Task 0.7 — Fantasy Opportunity (Expected Fantasy Points)
-- [ ] **Source:** `nfl.load_ff_opportunity(seasons)` — 159 columns
-- [ ] **Key data:** `total_fantasy_points_exp`, `total_fantasy_points_diff` (actual minus expected), `pass_fantasy_points_exp`, `rec_fantasy_points_exp`, `rush_fantasy_points_exp`, plus team-level shares for all stats
-- [ ] Create `src/nfl/data/fetch_ff_opportunity.py`
-- [ ] Fetch seasons 2018-2025, save to `data/nfl/ff_opportunity/ff_opportunity_{season}.parquet`
-- [ ] Verify: `total_fantasy_points_exp` should correlate with actual fantasy points (r > 0.7)
-- [ ] **Deliverable:** Expected vs actual fantasy points for all players, all seasons
-- [ ] **Note:** This directly feeds our POB model — players consistently above expected are outperformers
+- [x] **Source:** `nfl.load_ff_opportunity(seasons)` — 159 columns
+- [x] **Key data:** `total_fantasy_points_exp`, `total_fantasy_points_diff` (actual minus expected), `pass_fantasy_points_exp`, `rec_fantasy_points_exp`, `rush_fantasy_points_exp`, plus team-level shares for all stats
+- [x] Create `src/nfl/data/fetch_ff_opportunity.py`
+- [x] Fetch seasons 2018-2025, save to `data/nfl/ff_opportunity/ff_opportunity_{season}.parquet`
+- [x] Verify: `total_fantasy_points_exp` should correlate with actual fantasy points (r > 0.7)
+- [x] **Deliverable:** Expected vs actual fantasy points for all players, all seasons
+- [x] **Note:** This directly feeds our POB model — players consistently above expected are outperformers
 
 ---
 

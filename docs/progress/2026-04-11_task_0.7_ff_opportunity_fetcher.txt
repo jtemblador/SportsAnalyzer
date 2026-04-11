@@ -1,0 +1,48 @@
+Task 0.7 — Fantasy Opportunity Fetcher (Expected Fantasy Points)
+Date: 2026-04-11
+Status: Complete
+Tests: 14 new (96 total across project)
+
+Goal
+-----
+Pull weekly expected fantasy points data from nflreadpy for seasons 2018-2025.
+This gives us pre-calculated expected vs actual fantasy points per player per
+week — a direct signal for our POB model. Correlation between expected and
+actual is 0.842, confirming strong predictive value.
+
+Approach
+--------
+- Used nfl.load_ff_opportunity() which returns 159 columns including expected
+  stats for pass/rush/rec, actual vs expected differentials, and team-level
+  fantasy point shares.
+- One Parquet file per season: data/nfl/ff_opportunity/ff_opportunity_{season}.parquet
+- Stored data as-is including ~7% null player_id rows.
+
+Implementation
+--------------
+Created:
+- src/nfl/data/fetch_ff_opportunity.py — FFOpportunityFetcher class
+- data/nfl/ff_opportunity/ — 8 Parquet files (2018-2025), 47,282 total records
+- tests/test_fetch_ff_opportunity.py — 14 tests across 3 test classes
+
+Modified:
+- src/nfl/data/pipeline.py — registered FFOpportunityFetcher, added to fetch_all()
+
+Validation
+----------
+- Mahomes 2024 W1: actual=15.14, expected=13.14, diff=2.00. Correct.
+- diff = actual - expected verified mathematically for all 6,005 rows in 2024.
+- Fantasy points key columns: 0 nulls on actual, expected, and diff.
+- Row counts: 5,586-6,065 per season. Reasonable.
+- All 8 seasons fetched.
+
+Lessons Learned
+---------------
+- player_id is ~7% null. These rows have no player identification (full_name,
+  position also null). Store as-is, filter player_id.notna() during feature
+  engineering.
+- 159 columns is large but Parquet handles it efficiently. During feature
+  engineering we'll only use ~10-15 key columns: total_fantasy_points_exp,
+  total_fantasy_points_diff, and position-specific expected stats.
+- stat_type parameter exists ('weekly', 'pbp_pass', 'pbp_rush') but we only
+  need 'weekly' (the default). pbp variants are play-level granularity.

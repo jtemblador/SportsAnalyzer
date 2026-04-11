@@ -12,6 +12,7 @@ from src.nfl.data.fetch_schedules import ScheduleFetcher
 from src.nfl.data.fetch_injuries import InjuryFetcher
 from src.nfl.data.fetch_snap_counts import SnapCountFetcher
 from src.nfl.data.fetch_nextgen_stats import NextGenStatsFetcher
+from src.nfl.data.fetch_ff_opportunity import FFOpportunityFetcher
 
 
 class NFLDataPipeline:
@@ -39,6 +40,7 @@ class NFLDataPipeline:
         self.injury_fetcher = InjuryFetcher(data_dir=f"{self.nfl_dir}/injuries")
         self.snap_count_fetcher = SnapCountFetcher(data_dir=f"{self.nfl_dir}/snap_counts")
         self.nextgen_stats_fetcher = NextGenStatsFetcher(data_dir=f"{self.nfl_dir}/nextgen_stats")
+        self.ff_opportunity_fetcher = FFOpportunityFetcher(data_dir=f"{self.nfl_dir}/ff_opportunity")
 
         print(f"✓ NFL Pipeline initialized")
         print(f"  Data will be stored in: {self.nfl_dir}")
@@ -306,8 +308,10 @@ class NFLDataPipeline:
         # 5-7. Next Gen Stats (passing, rushing, receiving)
         self.nextgen_stats_fetcher.fetch_all(start_season, end_season)
 
+        # 8. Fantasy opportunity (expected fantasy points)
+        self.ff_opportunity_fetcher.fetch_all(start_season, end_season)
+
         # Future fetchers will be added here as tasks are completed:
-        # 8. FF Opportunity (Task 0.7)
         # 9. PFR Advanced Stats - passing (Task 0.8)
         # 10. PFR Advanced Stats - rushing (Task 0.9)
         # 11. PFR Advanced Stats - receiving (Task 0.10)
