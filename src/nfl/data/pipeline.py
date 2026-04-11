@@ -9,12 +9,13 @@ import nflreadpy as nfl
 from pathlib import Path
 
 from src.nfl.data.fetch_schedules import ScheduleFetcher
+from src.nfl.data.fetch_injuries import InjuryFetcher
 
 
 class NFLDataPipeline:
     """
-    Fetches NFL data using nflreadpy and stores it locally.
-    Data is stored as-is with no modifications.
+    Fetches NFL data using nflreadpy and stores it locally as Parquet files.
+    Orchestrates all dataset fetchers via fetch_all().
     """
     
     def __init__(self, base_data_dir: str = "./data"):
@@ -33,6 +34,7 @@ class NFLDataPipeline:
 
         # Initialize dataset fetchers
         self.schedule_fetcher = ScheduleFetcher(data_dir=f"{self.nfl_dir}/schedules")
+        self.injury_fetcher = InjuryFetcher(data_dir=f"{self.nfl_dir}/injuries")
 
         print(f"✓ NFL Pipeline initialized")
         print(f"  Data will be stored in: {self.nfl_dir}")
@@ -291,8 +293,10 @@ class NFLDataPipeline:
         # 2. Schedules (Vegas lines, weather, game context)
         self.schedule_fetcher.fetch_all(start_season, end_season)
 
+        # 3. Injuries (weekly injury reports, practice status)
+        self.injury_fetcher.fetch_all(start_season, end_season)
+
         # Future fetchers will be added here as tasks are completed:
-        # 3. Injuries (Task 0.2)
         # 4. Snap counts (Task 0.3)
         # 5. Next Gen Stats - passing (Task 0.4)
         # 6. Next Gen Stats - rushing (Task 0.5)
