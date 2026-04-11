@@ -10,7 +10,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 import psycopg2
+import pandas as pd
 from src.nfl.db.config import DB_CONFIG
+from src.nfl.db.connection import get_connection, get_engine
 
 # Expected column counts (Parquet columns + 1 for auto-generated id)
 EXPECTED_TABLES = {
@@ -132,3 +134,31 @@ class TestTablesEmpty:
             count = cur.fetchone()[0]
             assert count == 0, f"{table_name} has {count} rows (expected 0)"
         cur.close()
+
+
+class TestConnectionLayer:
+    """Verify get_connection() and get_engine() work."""
+
+    def test_get_connection(self):
+        conn = get_connection()
+        assert conn is not None
+        assert conn.closed == 0
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        assert cur.fetchone()[0] == 1
+        cur.close()
+        conn.close()
+
+    def test_get_engine(self):
+        engine = get_engine()
+        assert engine is not None
+        result = pd.read_sql("SELECT current_database()", engine)
+        assert result.iloc[0, 0] == 'nfl_predictions'
+        engine.dispose()
+
+    def test_get_engine_read_table(self):
+        """Engine can read from an actual table (even if empty)."""
+        engine = get_engine()
+        result = pd.read_sql("SELECT count(*) as cnt FROM players", engine)
+        assert result.iloc[0, 0] == 0
+        engine.dispose()

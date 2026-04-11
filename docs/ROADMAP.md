@@ -234,11 +234,11 @@ Two ID formats exist across our datasets:
 - [x] **Deliverable:** Empty database with all tables + indexes created
 
 ### Task 1.2 — Database connection layer
-- [ ] Create `src/nfl/db/connection.py` — connection pooling, config from env vars
-- [ ] Create `src/nfl/db/__init__.py` with convenience imports
-- [ ] Add `psycopg2` and `sqlalchemy` to `requirements.txt`
-- [ ] Add `.env.example` with database connection template
-- [ ] **Deliverable:** `get_engine()` and `get_connection()` functions that work
+- [x] Create `src/nfl/db/connection.py` — get_connection() and get_engine()
+- [x] Create `src/nfl/db/__init__.py` with convenience imports
+- [x] Add `psycopg2-binary`, `sqlalchemy`, `python-dotenv` to `requirements.txt`
+- [x] Add `.env.example` with database connection template
+- [x] **Deliverable:** `get_engine()` and `get_connection()` functions that work
 
 ### Task 1.3 — Bulk load all Parquet data into PostgreSQL
 - [ ] Write `src/nfl/db/load_all.py` — reads every Parquet directory and loads into corresponding table

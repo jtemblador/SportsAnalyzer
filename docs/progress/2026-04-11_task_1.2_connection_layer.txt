@@ -1,0 +1,25 @@
+Task 1.2 — Database Connection Layer
+Date: 2026-04-11
+Status: Complete
+Tests: 3 new (204 total across project)
+
+Goal
+-----
+Create reusable database connection functions that all future code will
+use — bulk loading, queries, feature engineering, and dashboard.
+
+Implementation
+--------------
+Created:
+- src/nfl/db/connection.py — get_connection() (psycopg2) and get_engine() (SQLAlchemy)
+
+Modified:
+- src/nfl/db/__init__.py — convenience imports
+- requirements.txt — added psycopg2-binary, sqlalchemy, python-dotenv (removed duckdb, fastparquet)
+- tests/test_database.py — 3 new tests for connection layer
+
+Usage:
+  from src.nfl.db import get_connection, get_engine
+
+  conn = get_connection()   # raw SQL via psycopg2
+  engine = get_engine()     # pandas to_sql/read_sql via SQLAlchemy
