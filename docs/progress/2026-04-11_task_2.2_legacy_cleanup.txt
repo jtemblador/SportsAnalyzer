@@ -1,0 +1,74 @@
+Task 2.2 — Legacy Code Cleanup
+Date: 2026-04-11
+Status: Complete
+Tests: 227 passed, 0 failed (down from 235+1fail — 10 dead tests removed, 2 added)
+
+Goal
+-----
+Organize the codebase so active code is clearly separated from historical
+ML reference code. Delete truly dead code, preserve V1-V4 ML progression
+in a dedicated legacy/ directory, and leave a clean test suite with 0 failures.
+
+Approach
+--------
+Used a hybrid strategy instead of pure deletion:
+1. Tagged current HEAD as v4-final for full reproducibility
+2. Moved V1-V4 ML code to legacy/v1-v4/ — preserves the ML progression
+   story (5.14→4.26 MAE) visually in the repo for portfolio reviewers
+3. Deleted truly dead code (paid Odds API) and broken tests
+4. Updated smoke tests to reflect active modules only
+
+This approach was chosen because:
+- Pure deletion loses the ML journey narrative (important for portfolio)
+- Pure "keep everything" clutters active code with dead references
+- The hybrid shows progression while keeping src/ clean
+
+Implementation
+--------------
+Tagged:
+- git tag v4-final — complete V4 codebase recoverable via git checkout
+
+Created:
+- legacy/README.md — MAE progression table, directory guide, V5 takeaways
+- legacy/v1-v4/features/ — 3 feature engineers (V1/V2, V3, V4)
+- legacy/v1-v4/models/ — POBModel, EVOBModel, StatPredictor, PositionSpecificEVOBModel
+- legacy/v1-v4/training/ — train.py, generate_predictions.py, v1-v4_retrain.py
+- legacy/v1-v4/data/ — column_mappings.py
+
+Deleted:
+- src/nfl/odds/ — paid Odds API (api_client.py, fetcher.py), fully replaced
+  by free schedule data in PostgreSQL
+- src/nfl/features/ — empty after move (removed __init__.py, __pycache__)
+- src/nfl/models/ — empty after move
+- src/nfl/training/ — empty after move
+- tests/test_ml_models.py — 1 test collected, always failed (KeyError)
+- tests/test_versioned_features.py — not collected by pytest, references raw/
+- tests/feature_engineer_test.py — not collected, references raw/
+- tests/train_models_test.py — not collected, references legacy models
+- tests/test_fixes.py — 2 tests that always skip/return True
+- tests/scripts/ — 11 ad-hoc scripts, not tests, multiple broken references
+
+Modified:
+- tests/test_smoke.py — replaced 9 legacy import tests (odds x2, features x3,
+  models x2, column_mappings x1, pipeline x1) with 3 active import tests
+  (pipeline, db connection, db queries)
+
+Validation
+----------
+- 227 tests pass, 0 failures, 0 collection errors
+- grep confirms zero imports of deleted/moved modules in src/ and tests/
+- src/nfl/ now contains only: data/, db/, __init__.py
+- legacy/v1-v4/ contains all 12 ML reference files in correct structure
+- v4-final tag verified with git tag -l
+
+Lessons Learned
+---------------
+- For ML portfolio projects, a legacy/ directory is better than pure deletion.
+  It tells the story: "I iterated through 4 versions, improving accuracy 17%."
+  Recruiters can browse the progression without needing git commands.
+- Git tags (v4-final) provide the safety net. If we ever need to reproduce
+  V4 results exactly, the full codebase is one command away.
+- Broken tests that aren't collected by pytest (import failures at module
+  level vs function level) are invisible — they don't show as failures but
+  they also don't test anything. Better to delete them than leave phantom
+  coverage.

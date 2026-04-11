@@ -3,13 +3,14 @@
 ## Current State
 - V4 production model: 4.26 MAE (17% improvement over V1 baseline)
 - **Phase 0 complete:** 13 datasets fetched, 248 Parquet files, 798,000+ records (2018-2025)
-- **Phase 1 complete:** PostgreSQL database with 798,176 rows across 14 tables, verified against NFL.com. `--refresh-db` flag automates DB sync after fetch. Legacy data directories cleaned up.
+- **Phase 1 complete:** PostgreSQL database with 798,176 rows across 14 tables, verified against NFL.com. `--refresh-db` flag automates DB sync after fetch.
+- **Phase 2 (Tasks 2.1-2.2) complete:** SQL query layer (7 functions, 30 tests), legacy code organized into `legacy/v1-v4/`
 - 10 fetcher classes registered in unified pipeline (`fetch_all()`, `fetch_latest()`, `--refresh-db`)
-- 205 tests passing (6 legacy migration tests removed, 1 pre-existing failure in legacy ML code)
-- `app.py` (Streamlit dashboard) is broken — uses legacy pipeline code that was removed. Will be rebuilt in Task 2.3.
-- Project restructured into modular `src/nfl/` sub-packages
+- 227 tests passing, 0 failures
+- `app.py` (Streamlit dashboard) is broken — will be rebuilt in Task 4.1
+- Project restructured: active code in `src/nfl/` (data + db), V1-V4 ML code in `legacy/v1-v4/`
+- Full V4 codebase tagged as `v4-final` for reproducibility
 - Full dataset audit — see `docs/AVAILABLE_DATASETS.md`
-- V1-V4 legacy code still exists in `src/nfl/features/`, `src/nfl/models/`, `src/nfl/training/`, `src/nfl/odds/` — kept as reference for V5, cleanup planned
 
 ## Goal
 1. Expand data collection to all useful nflreadpy datasets (Tier 1 + Tier 2)
@@ -282,13 +283,13 @@ Two ID formats exist across our datasets:
 - [x] **Deliverable:** All common data access patterns available as SQL queries (30 tests)
 
 ### Task 2.2 — Legacy code cleanup
-- [ ] Delete `src/nfl/odds/` — paid Odds API code, replaced by free schedule data in DB
-- [ ] Review `src/nfl/features/` (V1-V4 engineers) — keep as reference, document what to carry forward to V5
-- [ ] Review `src/nfl/models/` (V1-V4 model classes) — keep as reference for V5
-- [ ] Review `src/nfl/training/` (V1-V4 retrain scripts) — keep as reference for V5
-- [ ] Remove any dead imports or references to deleted code
-- [ ] Update smoke tests if they reference deleted modules
-- [ ] **Deliverable:** Dead code removed, legacy code documented as reference
+- [x] Delete `src/nfl/odds/` — paid Odds API code, replaced by free schedule data in DB
+- [x] Move `src/nfl/features/`, `models/`, `training/` to `legacy/v1-v4/` — preserves ML progression for portfolio
+- [x] Tag `v4-final` — complete V4 codebase recoverable via `git checkout v4-final`
+- [x] Remove broken tests (5 files) and ad-hoc scripts (`tests/scripts/`, 11 files)
+- [x] Update smoke tests to reference active modules only
+- [x] Create `legacy/README.md` with MAE progression and V5 takeaways
+- [x] **Deliverable:** Clean `src/nfl/` (data + db only), legacy preserved in `legacy/v1-v4/`, 227 tests passing
 
 ### Task 2.3 — Load predictions and model runs into DB
 - [ ] Create `predictions` and `model_runs` tables

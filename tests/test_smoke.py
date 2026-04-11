@@ -19,39 +19,15 @@ class TestImports:
         from src.nfl.data.pipeline import NFLDataPipeline
         assert NFLDataPipeline is not None
 
-    def test_import_column_mappings(self):
-        from src.nfl.data.column_mappings import COLUMN_DISPLAY_NAMES
-        assert isinstance(COLUMN_DISPLAY_NAMES, dict)
-        assert len(COLUMN_DISPLAY_NAMES) > 50
+    def test_import_db_connection(self):
+        from src.nfl.db.connection import get_connection, get_engine
+        assert get_connection is not None
+        assert get_engine is not None
 
-    def test_import_feature_engineer(self):
-        from src.nfl.features.engineer import FeatureEngineer
-        assert FeatureEngineer is not None
-
-    def test_import_v3_feature_engineer(self):
-        from src.nfl.features.v3_engineer import V3FeatureEngineer
-        assert V3FeatureEngineer is not None
-
-    def test_import_v4_feature_engineer(self):
-        from src.nfl.features.v4_engineer import FeatureEngineer
-        assert FeatureEngineer is not None
-
-    def test_import_base_models(self):
-        from src.nfl.models.base import NFLModelPipeline, POBModel, EVOBModel, StatPredictor
-        assert NFLModelPipeline is not None
-        assert POBModel is not None
-
-    def test_import_v4_models(self):
-        from src.nfl.models.v4_models import PositionSpecificEVOBModel
-        assert PositionSpecificEVOBModel is not None
-
-    def test_import_odds_client(self):
-        from src.nfl.odds.api_client import OddsAPIClient
-        assert OddsAPIClient is not None
-
-    def test_import_odds_fetcher(self):
-        from src.nfl.odds.fetcher import VegasLinesFetcher
-        assert VegasLinesFetcher is not None
+    def test_import_db_queries(self):
+        from src.nfl.db.queries import get_player_history, get_game_context
+        assert get_player_history is not None
+        assert get_game_context is not None
 
 
 class TestDataFiles:
