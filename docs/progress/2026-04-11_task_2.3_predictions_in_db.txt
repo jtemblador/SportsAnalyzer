@@ -1,0 +1,77 @@
+Task 2.3 — Load Predictions and Model Runs into DB
+Date: 2026-04-11
+Status: Complete
+Tests: 17 new in test_predictions.py (244 total passing, 0 failures)
+
+Goal
+-----
+Load all V1-V4 prediction data into PostgreSQL and backfill actual results
+from weekly_stats so we can run cross-version accuracy queries in SQL.
+
+Approach
+--------
+- Created two new tables: model_versions (metadata) and predictions (results).
+- Built an ETL script that scans prediction directories, loads Parquet files,
+  and backfills actual values by joining with weekly_stats per stat.
+- Predictions table includes computed error column (abs difference).
+- Review caught an FK ordering bug: on re-runs, DELETE FROM model_versions
+  would fail because predictions still referenced it. Fixed by truncating
+  predictions first in the ETL flow.
+
+Implementation
+--------------
+Created:
+- src/nfl/db/load_predictions.py — ETL: loads model versions, prediction
+  Parquets (4 versions, 51 files, 65,921 rows), backfills actuals (51,112
+  rows matched)
+- tests/test_predictions.py — 17 tests across 5 classes
+
+Modified:
+- src/nfl/db/schema.sql — added model_versions and predictions tables,
+  3 indexes (version lookup, player lookup, accuracy partial index)
+- tests/test_database.py — updated table count from 14 to 16
+
+Data Loaded
+-----------
+  model_versions:                4 rows
+  predictions:              65,921 rows
+    v1_baseline_mae5.14:    12,882 rows (11 files, weeks 2-12)
+    v2_variance_trends:     17,640 rows (13 files, weeks 1-13)
+    v3_epa_efficiency:      17,640 rows (13 files, weeks 1-13)
+    v4_position_specific:   17,759 rows (14 files, weeks 1-14)
+  Actuals backfilled:       51,112 rows
+
+Cross-Version Accuracy (fantasy_points_ppr)
+-------------------------------------------
+  v4_position_specific:  4.67 MAE (best)
+  v2_variance_trends:    4.68 MAE
+  v3_epa_efficiency:     4.68 MAE
+  v1_baseline_mae5.14:   4.97 MAE (worst)
+
+V4 MAE by Position:
+  TE: 3.62 (most predictable)
+  RB: 4.65
+  WR: 4.66
+  QB: 6.81 (hardest to predict)
+
+Validation
+----------
+- 17 tests: model version metadata, row counts, FK integrity, actuals
+  backfill, error computation, Mahomes spot-check, cross-version MAE
+  ordering, position-level MAE, value range checks
+- Re-run verified: ETL is idempotent (truncate + reload)
+- 244 total tests passing, 0 failures
+
+Lessons Learned
+---------------
+- DB-computed MAE (4.67 for V4) differs from reported training MAE (4.26)
+  because training MAE comes from walk-forward validation (train/test split)
+  while DB MAE is computed on all 2025 predictions with actuals. The relative
+  ordering is preserved — V4 is consistently best. Both numbers are valid,
+  they just measure different things.
+- FK ordering matters for idempotent ETL: must truncate the child table
+  (predictions) before deleting from the parent (model_versions). The review
+  phase caught this before it became a production issue.
+- POB model rows have NULL predicted_value (they predict probability, not
+  a stat value). These are correctly excluded from MAE calculations via
+  WHERE predicted_value IS NOT NULL.

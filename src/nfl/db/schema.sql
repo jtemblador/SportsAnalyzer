@@ -738,3 +738,40 @@ CREATE INDEX IF NOT EXISTS idx_team_stats_team ON team_stats ("team", "season", 
 CREATE INDEX IF NOT EXISTS idx_games_season_week ON games ("season", "week");
 CREATE INDEX IF NOT EXISTS idx_players_pfr ON players ("pfr_id");
 CREATE INDEX IF NOT EXISTS idx_players_gsis ON players ("gsis_id");
+
+-- Model version metadata
+CREATE TABLE IF NOT EXISTS model_versions (
+    version TEXT PRIMARY KEY,
+    description TEXT,
+    mae FLOAT,
+    prediction_weeks TEXT,
+    prediction_season INTEGER,
+    positions TEXT
+);
+
+-- Prediction results (all versions)
+CREATE TABLE IF NOT EXISTS predictions (
+    id SERIAL PRIMARY KEY,
+    version TEXT NOT NULL REFERENCES model_versions(version),
+    player_id TEXT,
+    player_name TEXT,
+    position TEXT,
+    team TEXT,
+    opponent TEXT,
+    season INTEGER NOT NULL,
+    week INTEGER NOT NULL,
+    stat TEXT NOT NULL,
+    model_type TEXT NOT NULL,
+    predicted_value FLOAT,
+    predicted_diff FLOAT,
+    confidence_lower FLOAT,
+    confidence_upper FLOAT,
+    baseline FLOAT,
+    probability_over FLOAT,
+    actual_value FLOAT,
+    error FLOAT
+);
+
+CREATE INDEX IF NOT EXISTS idx_predictions_version ON predictions (version, season, week);
+CREATE INDEX IF NOT EXISTS idx_predictions_player ON predictions (player_id, season, week, stat);
+CREATE INDEX IF NOT EXISTS idx_predictions_accuracy ON predictions (version, stat, model_type) WHERE actual_value IS NOT NULL;

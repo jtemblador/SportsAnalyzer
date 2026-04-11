@@ -57,7 +57,7 @@ class TestDatabaseConnection:
 
 class TestTablesExist:
 
-    def test_all_14_tables_exist(self, conn):
+    def test_all_tables_exist(self, conn):
         cur = conn.cursor()
         cur.execute("""
             SELECT table_name FROM information_schema.tables
@@ -66,7 +66,8 @@ class TestTablesExist:
         """)
         tables = [row[0] for row in cur.fetchall()]
         cur.close()
-        assert len(tables) == 14, f"Expected 14 tables, found {len(tables)}: {tables}"
+        # 14 data tables + 2 prediction tables (predictions, model_versions)
+        assert len(tables) == 16, f"Expected 16 tables, found {len(tables)}: {tables}"
 
     def test_each_table_exists(self, conn):
         cur = conn.cursor()

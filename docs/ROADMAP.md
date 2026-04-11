@@ -4,9 +4,9 @@
 - V4 production model: 4.26 MAE (17% improvement over V1 baseline)
 - **Phase 0 complete:** 13 datasets fetched, 248 Parquet files, 798,000+ records (2018-2025)
 - **Phase 1 complete:** PostgreSQL database with 798,176 rows across 14 tables, verified against NFL.com. `--refresh-db` flag automates DB sync after fetch.
-- **Phase 2 (Tasks 2.1-2.2) complete:** SQL query layer (7 functions, 30 tests), legacy code organized into `legacy/v1-v4/`
+- **Phase 2 complete:** SQL query layer (7 functions), legacy code in `legacy/v1-v4/`, 65,921 predictions loaded with cross-version accuracy queries
 - 10 fetcher classes registered in unified pipeline (`fetch_all()`, `fetch_latest()`, `--refresh-db`)
-- 227 tests passing, 0 failures
+- 244 tests passing, 0 failures
 - `app.py` (Streamlit dashboard) is broken — will be rebuilt in Task 4.1
 - Project restructured: active code in `src/nfl/` (data + db), V1-V4 ML code in `legacy/v1-v4/`
 - Full V4 codebase tagged as `v4-final` for reproducibility
@@ -292,11 +292,11 @@ Two ID formats exist across our datasets:
 - [x] **Deliverable:** Clean `src/nfl/` (data + db only), legacy preserved in `legacy/v1-v4/`, 227 tests passing
 
 ### Task 2.3 — Load predictions and model runs into DB
-- [ ] Create `predictions` and `model_runs` tables
-- [ ] Write ETL to load all `data/nfl/predictions/` (all versions) into database
-- [ ] Store model metadata (version, position, algorithm, MAE, hyperparams)
-- [ ] Backfill `actual_value` column by joining predictions with weekly_stats
-- [ ] **Deliverable:** Cross-version accuracy queries work in SQL
+- [x] Create `predictions` and `model_versions` tables in schema.sql
+- [x] Write ETL (`src/nfl/db/load_predictions.py`) to load all `data/nfl/predictions/` (4 versions, 65,921 rows)
+- [x] Store model metadata (version, description, MAE, prediction weeks, positions)
+- [x] Backfill `actual_value` and `error` columns by joining predictions with weekly_stats (51,112 rows matched)
+- [x] **Deliverable:** Cross-version accuracy queries work in SQL (V4 4.67 → V1 4.97 MAE, 17 tests)
 
 
 ---
