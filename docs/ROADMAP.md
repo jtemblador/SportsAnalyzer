@@ -271,7 +271,7 @@ Two ID formats exist across our datasets:
 **Goal:** Build SQL query functions, V5 feature engineer using all new data, and rebuild the dashboard.
 
 ### Task 2.1 — Database query layer
-- [ ] Create `src/nfl/db/queries.py` — reusable query functions:
+- [x] Create `src/nfl/db/queries.py` — reusable query functions:
   - `get_player_history(player_id, season, week, games_back)` — single SQL query replaces loading N Parquet files
   - `get_week_stats(season, week, position)` — replaces `pd.read_parquet()`
   - `get_player_injuries(player_id, season, week)` — injury status for a player
@@ -279,7 +279,7 @@ Two ID formats exist across our datasets:
   - `get_game_context(season, week, team)` — Vegas lines, weather, rest days
   - `get_opponent_defense_rank(team, position, season, week)` — uses team_stats table
   - `get_nextgen_stats(player_id, season, stat_type)` — NGS metrics
-- [ ] **Deliverable:** All common data access patterns available as SQL queries
+- [x] **Deliverable:** All common data access patterns available as SQL queries (30 tests)
 
 ### Task 2.2 — Legacy code cleanup
 - [ ] Delete `src/nfl/odds/` — paid Odds API code, replaced by free schedule data in DB

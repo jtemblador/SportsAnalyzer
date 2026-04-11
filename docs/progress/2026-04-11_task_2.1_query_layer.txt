@@ -1,0 +1,75 @@
+Task 2.1 — Database Query Layer
+Date: 2026-04-11
+Status: Complete
+Tests: 30 new tests in test_queries.py (235 total passing)
+
+Goal
+-----
+Create reusable SQL query functions that replace direct Parquet file reads.
+These become the primary data access layer for V5 feature engineering,
+the rebuilt dashboard, and ad-hoc analysis.
+
+Approach
+--------
+- Created 7 query functions in src/nfl/db/queries.py, each returning a
+  pandas DataFrame via pd.read_sql() with parameterized queries.
+- All queries use SQLAlchemy text() with :param binding to prevent SQL
+  injection. The cached engine from get_engine() avoids connection pool
+  churn.
+- get_snap_share() handles the GSIS→PFR ID mapping transparently via a
+  JOIN on the players table — callers always pass GSIS IDs.
+- get_opponent_defense_rank() uses a single SQL query with CTEs and
+  RANK() window function to compute all 32 team rankings in one pass,
+  then filters to the requested team. Returns a dict (not DataFrame)
+  since the result is a computed scalar.
+- get_nextgen_stats() uses an f-string for the table name from a 3-value
+  hardcoded dict — safe since the input is validated before interpolation.
+
+Implementation
+--------------
+Created:
+- src/nfl/db/queries.py — 7 query functions:
+  1. get_player_history(player_id, season, week, games_back)
+  2. get_week_stats(season, week, position)
+  3. get_player_injuries(player_id, season, week)
+  4. get_snap_share(player_id, season, week)
+  5. get_game_context(season, week, team)
+  6. get_opponent_defense_rank(opponent_team, position, season, week)
+  7. get_nextgen_stats(player_id, season, week, stat_type)
+- tests/test_queries.py — 30 tests across 7 test classes
+
+Modified:
+- src/nfl/db/__init__.py — added convenience imports for all 7 functions
+
+Validation
+----------
+All queries verified against known data:
+- get_player_history: Mahomes 6 games before 2024 W5, cross-season into 2023
+- get_week_stats: 2024 W1 returns 39 QBs, position filter works
+- get_player_injuries: Mahomes W18 Doubtful/Ankle, W1 healthy (empty)
+- get_snap_share: Barkley 80% offense, Mahomes >90% — GSIS→PFR mapping works
+- get_game_context: KC W1 spread 3.0, total 46.0, is_home=True, implied_total=24.5
+- get_opponent_defense_rank: BAL rank 31 vs QB at W10 (easy matchup)
+- get_nextgen_stats: Mahomes 2.72s time to throw, all 3 stat types work
+
+Edge cases tested:
+- Nonexistent player → empty DataFrame
+- Healthy player → empty injuries DataFrame
+- Week 1 defense rank → None (no prior data)
+- Invalid stat_type → ValueError
+- Cross-season lookback → correctly pulls prior season data
+
+No data leakage: all queries use strict week < :week for historical data.
+
+Lessons Learned
+---------------
+- The GSIS↔PFR ID mapping JOIN in get_snap_share is the pattern for any
+  query touching PFR-keyed tables (snap_counts, pfr_advstats). Future
+  queries for PFR advanced stats should follow the same pattern.
+- get_opponent_defense_rank counts individual player performances against
+  a defense, not games. This means a team facing 3 RBs in one game
+  contributes 3 data points. This is actually more accurate for fantasy
+  purposes — it captures how much total fantasy production a defense allows.
+- Returning dicts vs DataFrames: get_opponent_defense_rank returns a dict
+  because callers need a single rank number, not a table. All other
+  functions return DataFrames for consistency.
