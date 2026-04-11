@@ -10,6 +10,7 @@ from pathlib import Path
 
 from src.nfl.data.fetch_schedules import ScheduleFetcher
 from src.nfl.data.fetch_injuries import InjuryFetcher
+from src.nfl.data.fetch_snap_counts import SnapCountFetcher
 
 
 class NFLDataPipeline:
@@ -35,6 +36,7 @@ class NFLDataPipeline:
         # Initialize dataset fetchers
         self.schedule_fetcher = ScheduleFetcher(data_dir=f"{self.nfl_dir}/schedules")
         self.injury_fetcher = InjuryFetcher(data_dir=f"{self.nfl_dir}/injuries")
+        self.snap_count_fetcher = SnapCountFetcher(data_dir=f"{self.nfl_dir}/snap_counts")
 
         print(f"✓ NFL Pipeline initialized")
         print(f"  Data will be stored in: {self.nfl_dir}")
@@ -296,8 +298,10 @@ class NFLDataPipeline:
         # 3. Injuries (weekly injury reports, practice status)
         self.injury_fetcher.fetch_all(start_season, end_season)
 
+        # 4. Snap counts (offense/defense/ST snap percentages)
+        self.snap_count_fetcher.fetch_all(start_season, end_season)
+
         # Future fetchers will be added here as tasks are completed:
-        # 4. Snap counts (Task 0.3)
         # 5. Next Gen Stats - passing (Task 0.4)
         # 6. Next Gen Stats - rushing (Task 0.5)
         # 7. Next Gen Stats - receiving (Task 0.6)

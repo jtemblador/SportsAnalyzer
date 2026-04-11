@@ -1,0 +1,49 @@
+Task 0.3 — Snap Count Fetcher (Offense/Defense/ST Snap Percentages)
+Date: 2026-04-10
+Status: Complete
+Tests: 14 new (64 total across project)
+
+Goal
+-----
+Pull weekly NFL snap count data from nflreadpy for seasons 2018-2025. This
+gives us offense/defense/special teams snap counts and percentages per player
+per week — a direct measure of opportunity that we were previously missing.
+Snap share is a stronger signal of future production than inferring usage
+from box score stats.
+
+Approach
+--------
+- Used nfl.load_snap_counts() which returns 16 columns per player per week
+  including offense_snaps, offense_pct, defense_snaps, defense_pct, st_snaps,
+  st_pct.
+- One Parquet file per season: data/nfl/snap_counts/snap_counts_{season}.parquet
+- Stored data as-is. All 16 columns are 100% populated (zero nulls).
+- Built SnapCountFetcher following the same pattern as prior fetchers.
+
+Implementation
+--------------
+Created:
+- src/nfl/data/fetch_snap_counts.py — SnapCountFetcher class
+- data/nfl/snap_counts/ — 8 Parquet files (2018-2025), 205,354 total records
+- tests/test_fetch_snap_counts.py — 14 tests across 3 test classes
+
+Modified:
+- src/nfl/data/pipeline.py — registered SnapCountFetcher, added to fetch_all()
+
+Validation
+----------
+- Spot-check: Derrick Henry 2024 Week 1 → BAL, RB, offense_pct 0.46. Correct.
+- Zero nulls across all columns in all seasons.
+- offense_pct range 0.0-1.0 (not 0-100). Confirmed.
+- Row counts: 23,877-26,615 per season, 2,011-2,288 unique players.
+- All 8 seasons fetched successfully.
+
+Lessons Learned
+---------------
+- Snap count data uses pfr_player_id (PFR format like "HenrDe00"), not gsis_id
+  (GSIS format like "00-0033873"). Will need ID mapping via load_players() when
+  building features. Not a concern for raw data storage.
+- offense_pct uses 0.0-1.0 scale, not percentage. No conversion needed.
+- Data includes all positions (LB, CB, DE, etc.), not just fantasy-relevant ones.
+  Filter to QB/RB/WR/TE/K during feature engineering, store everything in raw.
+- Includes playoff weeks (up to week 22). More data for warm-up windows.
