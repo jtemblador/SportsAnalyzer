@@ -50,7 +50,7 @@ Every task follows the phase files in `.claude/instructions/`:
 ## Phase 0: Data Expansion — Tier 1 (Core Datasets)
 **Goal:** Pull all high-impact datasets into Parquet. No model changes yet — just get the data.
 
-### Task 0.1 — Schedules (Vegas lines + weather + game context)
+### ~~Task 0.1 — Schedules (Vegas lines + weather + game context)~~ [x]
 - **Source:** `nfl.load_schedules(seasons)` — 46 columns
 - **Key data:** `spread_line`, `total_line`, `home_moneyline`, `away_moneyline`, `temp`, `wind`, `roof`, `surface`, `home_rest`, `away_rest`, `stadium`, `div_game`, `overtime`, `home_score`, `away_score`
 - Create `src/nfl/data/fetch_schedules.py`
@@ -62,7 +62,7 @@ Every task follows the phase files in `.claude/instructions/`:
 - **Pipeline integration:** Register `ScheduleFetcher` in `NFLDataPipeline` so `fetch_all()` includes schedules
 - **Also:** Backfill raw player_stats for 2018-2019 (all weeks) and 2020 weeks 1-9 (currently missing)
 
-### Task 0.2 — Injuries
+### ~~Task 0.2 — Injuries~~ [x]
 - **Source:** `nfl.load_injuries(seasons)` — 16 columns
 - **Key data:** `report_status` (Out/Doubtful/Questionable/Probable), `report_primary_injury`, `practice_status` (DNP/Limited/Full), per player per week
 - Create `src/nfl/data/fetch_injuries.py`
@@ -70,7 +70,7 @@ Every task follows the phase files in `.claude/instructions/`:
 - Verify: check a known injury (e.g., a star player who missed games in 2024)
 - **Deliverable:** Weekly injury reports for all players, all seasons
 
-### Task 0.3 — Snap Counts
+### ~~Task 0.3 — Snap Counts~~ [x]
 - **Source:** `nfl.load_snap_counts(seasons)` — 16 columns
 - **Key data:** `offense_snaps`, `offense_pct`, `defense_snaps`, `defense_pct`, `st_snaps`, `st_pct`, per player per week
 - Create `src/nfl/data/fetch_snap_counts.py`
@@ -78,7 +78,7 @@ Every task follows the phase files in `.claude/instructions/`:
 - Verify: check a known starter has >70% offense_pct, a backup has <30%
 - **Deliverable:** Snap participation data for all players, all seasons
 
-### Task 0.4 — Next Gen Stats (Passing)
+### Task 0.4 — Next Gen Stats (Passing) [ ]
 - **Source:** `nfl.load_nextgen_stats(seasons, stat_type='passing')` — 29 columns
 - **Key data:** `avg_time_to_throw`, `avg_completed_air_yards`, `avg_intended_air_yards`, `aggressiveness`, `completion_percentage_above_expectation`, `expected_completion_percentage`, `max_completed_air_distance`
 - Create `src/nfl/data/fetch_nextgen_stats.py` (handles all 3 stat types)
@@ -86,7 +86,7 @@ Every task follows the phase files in `.claude/instructions/`:
 - Verify: check a known QB has reasonable values (Mahomes time_to_throw ~2.5-3.0s)
 - **Deliverable:** QB-level Next Gen passing metrics for all seasons
 
-### Task 0.5 — Next Gen Stats (Rushing)
+### Task 0.5 — Next Gen Stats (Rushing) [ ]
 - **Source:** `nfl.load_nextgen_stats(seasons, stat_type='rushing')` — 22 columns
 - **Key data:** `efficiency`, `avg_time_to_los`, `rush_yards_over_expected`, `rush_yards_over_expected_per_att`, `rush_pct_over_expected`, `percent_attempts_gte_eight_defenders`
 - Use the same `src/nfl/data/fetch_nextgen_stats.py` from Task 0.4
@@ -94,7 +94,7 @@ Every task follows the phase files in `.claude/instructions/`:
 - Verify: top RBs should have positive `rush_yards_over_expected`
 - **Deliverable:** RB-level Next Gen rushing metrics for all seasons
 
-### Task 0.6 — Next Gen Stats (Receiving)
+### Task 0.6 — Next Gen Stats (Receiving) [ ]
 - **Source:** `nfl.load_nextgen_stats(seasons, stat_type='receiving')` — 23 columns
 - **Key data:** `avg_cushion`, `avg_separation`, `avg_intended_air_yards`, `catch_percentage`, `avg_yac_above_expectation`, `avg_expected_yac`, `percent_share_of_intended_air_yards`
 - Use the same `src/nfl/data/fetch_nextgen_stats.py` from Task 0.4
@@ -102,7 +102,7 @@ Every task follows the phase files in `.claude/instructions/`:
 - Verify: elite WRs should have high separation (~3.0+) and positive YAC above expectation
 - **Deliverable:** WR/TE-level Next Gen receiving metrics for all seasons
 
-### Task 0.7 — Fantasy Opportunity (Expected Fantasy Points)
+### Task 0.7 — Fantasy Opportunity (Expected Fantasy Points) [ ]
 - **Source:** `nfl.load_ff_opportunity(seasons)` — 159 columns
 - **Key data:** `total_fantasy_points_exp`, `total_fantasy_points_diff` (actual minus expected), `pass_fantasy_points_exp`, `rec_fantasy_points_exp`, `rush_fantasy_points_exp`, plus team-level shares for all stats
 - Create `src/nfl/data/fetch_ff_opportunity.py`
@@ -116,7 +116,7 @@ Every task follows the phase files in `.claude/instructions/`:
 ## Phase 0B: Data Expansion — Tier 2 (Advanced Datasets)
 **Goal:** Pull supplementary datasets that add meaningful signal.
 
-### Task 0.8 — PFR Advanced Stats (Passing)
+### Task 0.8 — PFR Advanced Stats (Passing) [ ]
 - **Source:** `nfl.load_pfr_advstats(seasons, stat_type='pass')` — 24 columns
 - **Key data:** `passing_drops`, `passing_drop_pct`, `passing_bad_throws`, `passing_bad_throw_pct`, `times_pressured`, `times_pressured_pct`, `times_hurried`, `times_blitzed`, `times_hit`
 - Create `src/nfl/data/fetch_pfr_advstats.py` (handles all 3 stat types)
@@ -124,7 +124,7 @@ Every task follows the phase files in `.claude/instructions/`:
 - Verify: QBs behind bad O-lines should have high `times_pressured_pct` (>30%)
 - **Deliverable:** QB pressure and accuracy metrics for all seasons
 
-### Task 0.9 — PFR Advanced Stats (Rushing)
+### Task 0.9 — PFR Advanced Stats (Rushing) [ ]
 - **Source:** `nfl.load_pfr_advstats(seasons, stat_type='rush')` — 16 columns
 - **Key data:** `rushing_yards_before_contact`, `rushing_yards_before_contact_avg`, `rushing_yards_after_contact`, `rushing_yards_after_contact_avg`, `rushing_broken_tackles`
 - Use the same `src/nfl/data/fetch_pfr_advstats.py` from Task 0.8
@@ -132,7 +132,7 @@ Every task follows the phase files in `.claude/instructions/`:
 - Verify: elite RBs should have high yards_after_contact_avg (>2.5)
 - **Deliverable:** RB contact and elusiveness metrics for all seasons
 
-### Task 0.10 — PFR Advanced Stats (Receiving)
+### Task 0.10 — PFR Advanced Stats (Receiving) [ ]
 - **Source:** `nfl.load_pfr_advstats(seasons, stat_type='rec')` — 17 columns
 - **Key data:** `receiving_drop`, `receiving_drop_pct`, `receiving_broken_tackles`, `receiving_int` (INTs on targets), `receiving_rat` (passer rating when targeted)
 - Use the same `src/nfl/data/fetch_pfr_advstats.py` from Task 0.8
@@ -140,7 +140,7 @@ Every task follows the phase files in `.claude/instructions/`:
 - Verify: reliable receivers should have drop_pct < 5%
 - **Deliverable:** WR/TE reliability and target quality metrics for all seasons
 
-### Task 0.11 — Team Stats
+### Task 0.11 — Team Stats [ ]
 - **Source:** `nfl.load_team_stats(seasons)` — 102 columns
 - **Key data:** Team-level per-week totals — offensive/defensive EPA, yards, TDs, turnovers, all split by pass/rush/receive
 - Create `src/nfl/data/fetch_team_stats.py`
@@ -149,7 +149,7 @@ Every task follows the phase files in `.claude/instructions/`:
 - **Deliverable:** Team offensive and defensive quality metrics for all seasons
 - **Note:** Replaces our manual opponent defense rank calculation with direct data
 
-### Task 0.12 — Depth Charts
+### Task 0.12 — Depth Charts [ ]
 - **Source:** `nfl.load_depth_charts(seasons)` — 15 columns
 - **Key data:** `depth_team` (1=starter, 2=backup, 3=third string), `depth_position`, `formation` (Offense/Defense/Special Teams), weekly per player
 - Create `src/nfl/data/fetch_depth_charts.py`
@@ -157,7 +157,7 @@ Every task follows the phase files in `.claude/instructions/`:
 - Verify: known starters should have `depth_team=1`, known backups `depth_team=2`
 - **Deliverable:** Weekly starter/backup status for all players, all seasons
 
-### Task 0.13 — Unified data pipeline update
+### Task 0.13 — Unified data pipeline update [ ]
 - Update `NFLDataPipeline` in `src/nfl/data/pipeline.py` to orchestrate ALL fetch scripts
 - Add `fetch_all()` method that runs all fetchers for a given season range
 - Add `fetch_latest()` method that only fetches the most recent week across all datasets
@@ -170,7 +170,7 @@ Every task follows the phase files in `.claude/instructions/`:
 ## Phase 1: PostgreSQL Foundation
 **Goal:** Get PostgreSQL running, schema designed around ALL datasets, data loaded.
 
-### Task 1.1 — Database setup and schema
+### Task 1.1 — Database setup and schema [ ]
 - Install/configure PostgreSQL locally
 - Create `nfl_predictions` database
 - Design schema for ALL datasets (not just player stats):
@@ -193,27 +193,27 @@ Every task follows the phase files in `.claude/instructions/`:
 - Write schema migration script
 - **Deliverable:** Empty database with all tables, schema script in `src/nfl/db/schema.sql`
 
-### Task 1.2 — Database connection layer
+### Task 1.2 — Database connection layer [ ]
 - Create `src/nfl/db/connection.py` — connection pooling, config from env vars
 - Create `src/nfl/db/__init__.py` with convenience imports
 - Add `psycopg2` and `sqlalchemy` to `requirements.txt`
 - Add `.env.example` with database connection template
 - **Deliverable:** `get_engine()` and `get_connection()` functions that work
 
-### Task 1.3 — Bulk load all Parquet data into PostgreSQL
+### Task 1.3 — Bulk load all Parquet data into PostgreSQL [ ]
 - Write `src/nfl/db/load_all.py` — reads every Parquet directory and loads into corresponding table
 - Load order matters (reference tables first): teams → players → games → everything else
 - Handle duplicates gracefully (upsert or skip)
 - Print summary: row counts per table, any skipped/failed records
 - **Deliverable:** All historical data (2018-2025, all datasets) queryable in PostgreSQL
 
-### Task 1.4 — Dual-write data pipeline
+### Task 1.4 — Dual-write data pipeline [ ]
 - Modify data pipeline so every fetch writes to both Parquet AND PostgreSQL
 - All 12 fetch scripts insert into their respective DB tables after saving Parquet
 - New players and teams auto-inserted on first encounter
 - **Deliverable:** `python src/nfl/data/pipeline.py` writes to both destinations
 
-### Task 1.5 — Database smoke tests
+### Task 1.5 — Database smoke tests [ ]
 - Test connection, table existence, row counts per table
 - Test basic queries: player by name, stats by week, team lookup, injury by week
 - Test join queries: player stats + snap counts + injuries for a given week
@@ -226,7 +226,7 @@ Every task follows the phase files in `.claude/instructions/`:
 ## Phase 2: Pipeline Reads from DB
 **Goal:** Feature engineering and dashboard read from PostgreSQL instead of Parquet files.
 
-### Task 2.1 — Database query layer
+### Task 2.1 — Database query layer [ ]
 - Create `src/nfl/db/queries.py` — reusable query functions:
   - `get_player_history(player_id, season, week, games_back)` — single SQL query replaces loading N Parquet files
   - `get_week_stats(season, week, position)` — replaces `pd.read_parquet()`
@@ -237,19 +237,19 @@ Every task follows the phase files in `.claude/instructions/`:
   - `get_nextgen_stats(player_id, season, stat_type)` — NGS metrics
 - **Deliverable:** All common data access patterns available as SQL queries
 
-### Task 2.2 — Feature engineer reads from DB
+### Task 2.2 — Feature engineer reads from DB [ ]
 - Create DB-backed version of `load_player_history()` (single SQL query vs loading N Parquet files)
 - Add `source='db'` or `source='parquet'` parameter to FeatureEngineer
 - Benchmark: DB reads should be faster for cross-week queries
 - **Deliverable:** Feature engineering can run against PostgreSQL
 
-### Task 2.3 — Dashboard reads from DB
+### Task 2.3 — Dashboard reads from DB [ ]
 - Modify `app.py` to query PostgreSQL instead of loading Parquet files
 - Streamlit filters translate to SQL WHERE clauses
 - Fallback to Parquet if DB connection fails
 - **Deliverable:** Dashboard works identically but backed by PostgreSQL
 
-### Task 2.4 — Load predictions and model runs into DB
+### Task 2.4 — Load predictions and model runs into DB [ ]
 - Create `predictions` and `model_runs` tables
 - Write ETL to load all `data/nfl/predictions/` (all versions) into database
 - Store model metadata (version, position, algorithm, MAE, hyperparams)
@@ -261,13 +261,13 @@ Every task follows the phase files in `.claude/instructions/`:
 ## Phase 3: V5 Model Improvements
 **Goal:** Use all new data sources + database to improve MAE below 4.0.
 
-### Task 3.1 — Replace paid Odds API with schedule data
+### Task 3.1 — Replace paid Odds API with schedule data [ ]
 - Rewrite V4 Vegas features to pull from `games` table (nflreadpy schedule data)
 - Remove dependency on `src/nfl/odds/api_client.py` and The Odds API
 - Verify V4 MAE is preserved or improved with the new odds source
 - **Deliverable:** V4 model works without paid API, using free schedule data
 
-### Task 3.2 — V5 feature engineering
+### Task 3.2 — V5 feature engineering [ ]
 - Build new features from the expanded datasets:
   - **From schedules:** implied team total, spread, weather features (wind, temp, dome), rest days, divisional game flag
   - **From injuries:** teammate injury impact (is WR1 out? is starting QB out?), player's own injury status
@@ -284,14 +284,14 @@ Every task follows the phase files in `.claude/instructions/`:
 - Target: 70-80 features (up from V4's 50)
 - **Deliverable:** V5 feature engineer in `src/nfl/features/v5_engineer.py`
 
-### Task 3.3 — V5 model training and evaluation
+### Task 3.3 — V5 model training and evaluation [ ]
 - Train V5 models with expanded feature set
 - Compare MAE against V4 (4.26) per position
 - Feature importance analysis — which new datasets helped most?
 - Position-specific tuning
 - **Target MAE:** < 4.0
 
-### Task 3.4 — Prediction accuracy dashboard
+### Task 3.4 — Prediction accuracy dashboard [ ]
 - New Streamlit tab: model accuracy over time, by position, by version
 - Powered by SQL queries joining predictions with actuals
 - Visual: predicted vs actual scatter plots, MAE trend charts
@@ -302,15 +302,15 @@ Every task follows the phase files in `.claude/instructions/`:
 ## Phase 4: Production Hardening (Future)
 **Goal:** Make the project production-grade and impressive on a resume.
 
-### Task 4.1 — FastAPI REST endpoints
+### Task 4.1 — FastAPI REST endpoints [ ]
 - API layer on top of PostgreSQL (player stats, predictions, model accuracy)
 - Proper request/response schemas with Pydantic
 
-### Task 4.2 — Automated weekly pipeline
+### Task 4.2 — Automated weekly pipeline [ ]
 - Cron job or scheduled task: fetch new data → features → predictions → DB
 - End-to-end automation
 
-### Task 4.3 — Docker containerization
+### Task 4.3 — Docker containerization [ ]
 - Dockerfile for app + PostgreSQL via docker-compose
 - One-command setup for anyone cloning the repo
 
