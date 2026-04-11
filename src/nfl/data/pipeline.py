@@ -1,15 +1,14 @@
 """
-File: src/nfl/nfl_pipeline.py
+File: src/nfl/data/pipeline.py
 
-NFL data fetching and storing pipeline using nflreadpy
-Stores data in: data/nfl/raw/
-No cleaning - stores data exactly as received from API
+NFL data fetching and storing pipeline using nflreadpy.
+Orchestrates all dataset fetchers and stores data as Parquet files.
 """
 
 import nflreadpy as nfl
-import pandas as pd
 from pathlib import Path
-from datetime import datetime
+
+from src.nfl.data.fetch_schedules import ScheduleFetcher
 
 
 class NFLDataPipeline:
@@ -21,19 +20,22 @@ class NFLDataPipeline:
     def __init__(self, base_data_dir: str = "./data"):
         """
         Initialize the NFL pipeline.
-        
+
         Args:
             base_data_dir: Base directory for all sports data (default: ./data)
         """
         # Set up paths for NFL data storage
         self.nfl_dir = f"{base_data_dir}/nfl"
         self.raw_dir = f"{self.nfl_dir}/raw"
-        
+
         # Create directories if they don't exist
         Path(self.raw_dir).mkdir(parents=True, exist_ok=True)
-        
+
+        # Initialize dataset fetchers
+        self.schedule_fetcher = ScheduleFetcher(data_dir=f"{self.nfl_dir}/schedules")
+
         print(f"✓ NFL Pipeline initialized")
-        print(f"  Data will be stored in: {self.raw_dir}")
+        print(f"  Data will be stored in: {self.nfl_dir}")
     
     def get_current_week(self):
         """
@@ -91,22 +93,6 @@ class NFLDataPipeline:
         return (max_season, max_week)
     
     def check_file_exists(self, season, week):
-        """
-        Check if data for a specific season/week already exists.
-        
-        Args:
-            season: Season year
-            week: Week number
-        
-        Returns:
-            bool: True if file exists, False otherwise
-        """
-        # Create expected filename
-        filename = f"player_stats_{season}_week_{week}.parquet"
-        filepath = f"{self.raw_dir}/{filename}"
-        
-        # Check if file exists
-        return Path(filepath).exists()
         """
         Check if data for a specific season/week already exists.
         
@@ -244,92 +230,87 @@ class NFLDataPipeline:
         self.print_data_summary(player_stats, f"Week {week}, Season {season}")
         
         # Save data with consistent naming
-        filepath = self.save_data(player_stats, season, week)
-        
+        self.save_data(player_stats, season, week)
+
         print(f"✅ Saved {len(player_stats):,} records")
         
         return player_stats
 
+    def fetch_all_player_stats(self, start_season=2018, end_season=None):
+        """
+        Fetch player stats for all seasons/weeks, skipping existing files.
+
+        Args:
+            start_season: First season to fetch
+            end_season: Last season to fetch (default: current season)
+        """
+        if end_season is None:
+            end_season = self.get_current_season()
+
+        print("\nFetching player stats...")
+        total_fetched = 0
+
+        for season in range(start_season, end_season + 1):
+            max_week = 18
+            for week in range(1, max_week + 1):
+                if self.check_file_exists(season, week):
+                    continue
+                result = self.run_pipeline(season=season, week=week, silent_check=True)
+                if result is not None:
+                    total_fetched += 1
+                elif season == end_season:
+                    # Current season, week hasn't happened yet — stop this season
+                    break
+
+        if total_fetched > 0:
+            print(f"  Fetched {total_fetched} new weeks of player stats")
+        else:
+            print("  Player stats up to date")
+
+    def fetch_all(self, start_season=2018, end_season=None):
+        """
+        Fetch ALL datasets for the given season range.
+        Each fetcher skips data that already exists on disk.
+
+        Args:
+            start_season: First season to fetch (default: 2018 for warm-up data)
+            end_season: Last season to fetch (default: current season)
+        """
+        if end_season is None:
+            end_season = self.get_current_season()
+
+        print("=" * 60)
+        print("NFL DATA PIPELINE - Fetch All Datasets")
+        print("=" * 60)
+        print(f"Seasons: {start_season}-{end_season}")
+        print()
+
+        # 1. Player stats (existing, per-week files)
+        self.fetch_all_player_stats(start_season, end_season)
+
+        # 2. Schedules (Vegas lines, weather, game context)
+        self.schedule_fetcher.fetch_all(start_season, end_season)
+
+        # Future fetchers will be added here as tasks are completed:
+        # 3. Injuries (Task 0.2)
+        # 4. Snap counts (Task 0.3)
+        # 5. Next Gen Stats - passing (Task 0.4)
+        # 6. Next Gen Stats - rushing (Task 0.5)
+        # 7. Next Gen Stats - receiving (Task 0.6)
+        # 8. FF Opportunity (Task 0.7)
+        # 9. PFR Advanced Stats - passing (Task 0.8)
+        # 10. PFR Advanced Stats - rushing (Task 0.9)
+        # 11. PFR Advanced Stats - receiving (Task 0.10)
+        # 12. Team stats (Task 0.11)
+        # 13. Depth charts (Task 0.12)
+
+        print()
+        print("=" * 60)
+        print("All datasets up to date!")
+        print("=" * 60)
+
 
 # Allow this file to be run independently
 if __name__ == "__main__":
-    print("=" * 60)
-    print("NFL DATA FETCHER - Incremental Update")
-    print("=" * 60)
-    
-    # Initialize pipeline
     pipeline = NFLDataPipeline()
-    
-    # Find the most recent season/week we have in our database
-    last_season, last_week = pipeline.get_last_downloaded_week()
-    
-    print(f"\n📂 Last downloaded data: Season {last_season}, Week {last_week}")
-    print(f"🔄 Checking for new data...")
-    print()
-    
-    # Track how many new files we download
-    total_fetched = 0
-    
-    # Calculate the next week to check (week after last downloaded)
-    current_season = last_season
-    current_week = last_week + 1
-    
-    # If we've gone past week 18, move to next season's week 1
-    if current_week > 18:
-        current_season += 1
-        current_week = 1
-    
-    # Keep fetching new weeks until we hit a week with no data
-    weeks_per_season = 18
-    found_data = True  # Flag to track if we should keep checking
-    
-    # Loop until we find a week with no data or reach 2026
-    while found_data and current_season <= 2025:
-        # Silently check if this week's file already exists
-        if pipeline.check_file_exists(current_season, current_week):
-            # File exists, skip to next week (no output)
-            current_week += 1
-            if current_week > weeks_per_season:
-                current_season += 1
-                current_week = 1
-            continue
-        
-        try:
-            # Try to fetch data for this season/week
-            # silent_check=True prevents duplicate "already exists" messages
-            result = pipeline.run_pipeline(season=current_season, week=current_week, silent_check=True)
-            
-            # Check if we got data back
-            if result is None:
-                # No data available - this week hasn't started yet
-                # Stop checking further weeks
-                print(f"   → Week hasn't started yet. Stopping here.")
-                found_data = False
-            else:
-                # Successfully fetched and saved data
-                total_fetched += 1
-                
-                # Move to next week
-                current_week += 1
-                if current_week > weeks_per_season:
-                    current_season += 1
-                    current_week = 1
-                
-        except Exception as e:
-            # If there's an error, stop checking
-            print(f"⚠️  Error: {str(e)}")
-            found_data = False
-    
-    # Print final summary
-    print("\n" + "=" * 60)
-    print("✅ UPDATE COMPLETE!")
-    print("=" * 60)
-    
-    if total_fetched > 0:
-        print(f"New files downloaded: {total_fetched}")
-        print(f"Data stored in: {pipeline.raw_dir}")
-    else:
-        print(f"No new data available - you're up to date!")
-        print(f"Last data: Season {last_season}, Week {last_week}")
-    
-    print("=" * 60)
+    pipeline.fetch_all()
