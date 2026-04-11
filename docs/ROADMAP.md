@@ -179,31 +179,59 @@ Every task follows the phase files in `.claude/instructions/`:
 
 ---
 
+## Pre-Phase 1: Data Inventory & ID Mapping
+
+### Findings: Player ID Formats
+Two ID formats exist across our datasets:
+- **GSIS** (`00-0033873`): Used by player_stats, injuries, NGS, ff_opportunity, depth_charts (6 datasets)
+- **PFR** (`MahoPa00`): Used by snap_counts, pfr_advstats (4 datasets)
+
+`nfl.load_players()` provides the mapping table (24,376 all-time players back to 1974). For our purposes, only ~3,300 players are relevant (last_season >= 2024). 22,214 have both GSIS + PFR IDs.
+
+### Task 1.0 — Data catalog and player ID mapping table
+- [ ] Create `docs/DATA_CATALOG.md` — complete reference of all datasets, columns, join keys, quirks
+- [ ] Fetch `nfl.load_players()` and store as `data/nfl/players/players.parquet`
+- [ ] Build GSIS↔PFR ID mapping filtered to relevant players (last_season >= 2018)
+- [ ] Verify mapping covers all players in snap_counts and pfr_advstats
+- [ ] Add PlayerMappingFetcher to pipeline
+- [ ] **Deliverable:** Data catalog doc + player ID lookup table for cross-dataset joins
+
+---
+
 ## Phase 1: PostgreSQL Foundation
-**Goal:** Get PostgreSQL running, schema designed around ALL datasets, data loaded.
+**Goal:** Get PostgreSQL running, schema designed around ALL datasets (see `docs/DATA_CATALOG.md`), data loaded.
 
 ### Task 1.1 — Database setup and schema
 - [ ] Install/configure PostgreSQL locally
 - [ ] Create `nfl_predictions` database
-- [ ] Design schema for ALL datasets (not just player stats):
-  - `teams` — team reference table
-  - `players` — player reference table (from `load_players()`)
-  - `games` — schedule, scores, Vegas lines, weather, rest days (from schedules)
-  - `weekly_stats` — player box scores (from player_stats)
-  - `injuries` — weekly injury reports
-  - `snap_counts` — weekly snap participation
-  - `nextgen_passing` — NGS passing metrics
-  - `nextgen_rushing` — NGS rushing metrics
-  - `nextgen_receiving` — NGS receiving metrics
-  - `ff_opportunity` — expected fantasy points
-  - `pfr_pass_advstats` — PFR passing advanced
-  - `pfr_rush_advstats` — PFR rushing advanced
-  - `pfr_rec_advstats` — PFR receiving advanced
-  - `team_stats` — team-level weekly stats
-  - `depth_charts` — weekly depth chart positions
-- [ ] Add indexes for common query patterns (player+season+week, team+season+week)
-- [ ] Write schema migration script
-- [ ] **Deliverable:** Empty database with all tables, schema script in `src/nfl/db/schema.sql`
+- [ ] Design schema using DATA_CATALOG.md as the source of truth:
+  - **Reference tables** (loaded first):
+    - `teams` — 32 NFL teams with abbreviations, names, conference, division
+    - `players` — player reference with both GSIS + PFR IDs (from `load_players()`)
+  - **Game-level tables:**
+    - `games` — from schedules: scores, Vegas lines, weather, rest days, coaches, referee (48 cols)
+  - **Player-week tables** (join via player GSIS ID + season + week):
+    - `weekly_stats` — from player_stats: box scores, fantasy points (114 cols)
+    - `injuries` — from injuries: game-day status, practice status (16 cols)
+    - `depth_charts` — from depth_charts: starter/backup status (15 cols, 2018-2024 only)
+  - **Player-week tables** (join via player PFR ID + season + week, mapped through players table):
+    - `snap_counts` — from snap_counts: offense/defense/ST snap pct (16 cols)
+    - `pfr_pass_advstats` — from pfr_pass: pressure, drops, bad throws (24 cols)
+    - `pfr_rush_advstats` — from pfr_rush: yards before/after contact (16 cols)
+    - `pfr_rec_advstats` — from pfr_rec: drop rate, passer rating when targeted (17 cols)
+  - **Player-week tables** (join via player GSIS ID + season + week, qualified players only):
+    - `ngs_passing` — from ngs_passing: time to throw, CPOE, aggressiveness (29 cols)
+    - `ngs_rushing` — from ngs_rushing: rush yards over expected, efficiency (22 cols)
+    - `ngs_receiving` — from ngs_receiving: separation, YAC above expected (23 cols)
+    - `ff_opportunity` — from ff_opportunity: expected fantasy points (159 cols)
+  - **Team-week tables:**
+    - `team_stats` — from team_stats: team-level EPA, yards, turnovers (102 cols)
+- [ ] Add indexes for common query patterns:
+  - Player lookup: `(player_gsis_id, season, week)`, `(player_pfr_id, season, week)`
+  - Team lookup: `(team, season, week)`
+  - Game lookup: `(season, week, home_team)`
+- [ ] Write schema migration script: `src/nfl/db/schema.sql`
+- [ ] **Deliverable:** Empty database with all tables + indexes created
 
 ### Task 1.2 — Database connection layer
 - [ ] Create `src/nfl/db/connection.py` — connection pooling, config from env vars
@@ -214,21 +242,22 @@ Every task follows the phase files in `.claude/instructions/`:
 
 ### Task 1.3 — Bulk load all Parquet data into PostgreSQL
 - [ ] Write `src/nfl/db/load_all.py` — reads every Parquet directory and loads into corresponding table
-- [ ] Load order matters (reference tables first): teams → players → games → everything else
+- [ ] Load order: teams → players → games → all player-week tables → team_stats
 - [ ] Handle duplicates gracefully (upsert or skip)
 - [ ] Print summary: row counts per table, any skipped/failed records
-- [ ] **Deliverable:** All historical data (2018-2025, all datasets) queryable in PostgreSQL
+- [ ] Verify total row counts match Parquet files (see DATA_CATALOG.md for expected counts)
+- [ ] **Deliverable:** All historical data (2018-2025, 791K+ records) queryable in PostgreSQL
 
 ### Task 1.4 — Dual-write data pipeline
 - [ ] Modify data pipeline so every fetch writes to both Parquet AND PostgreSQL
-- [ ] All 12 fetch scripts insert into their respective DB tables after saving Parquet
+- [ ] All fetcher classes insert into their respective DB tables after saving Parquet
 - [ ] New players and teams auto-inserted on first encounter
 - [ ] **Deliverable:** `python src/nfl/data/pipeline.py` writes to both destinations
 
 ### Task 1.5 — Database smoke tests
 - [ ] Test connection, table existence, row counts per table
 - [ ] Test basic queries: player by name, stats by week, team lookup, injury by week
-- [ ] Test join queries: player stats + snap counts + injuries for a given week
+- [ ] Test cross-ID join: player_stats (GSIS) → players → snap_counts (PFR) for same player
 - [ ] Test that loaded data matches sample Parquet files exactly
 - [ ] Test dual-write: mock a fetch → verify data in both Parquet and DB
 - [ ] **Deliverable:** `tests/test_database.py` passes
