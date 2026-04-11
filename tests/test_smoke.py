@@ -57,10 +57,10 @@ class TestImports:
 class TestDataFiles:
     """Verify data files exist and are readable."""
 
-    def test_raw_data_exists(self):
-        raw_dir = ROOT / "data" / "nfl" / "raw"
-        parquet_files = list(raw_dir.glob("*.parquet"))
-        assert len(parquet_files) > 0, "No raw data files found"
+    def test_player_stats_exist(self):
+        stats_dir = ROOT / "data" / "nfl" / "player_stats"
+        parquet_files = list(stats_dir.glob("*.parquet"))
+        assert len(parquet_files) >= 8, "Expected at least 8 per-season player stats files"
 
     def test_feature_files_exist(self):
         features_dir = ROOT / "data" / "nfl" / "features" / "v4_position_specific"
@@ -77,10 +77,10 @@ class TestDataFiles:
         parquet_files = list(pred_dir.glob("*.parquet"))
         assert len(parquet_files) > 0, "No V4 prediction files found"
 
-    def test_raw_data_readable(self):
+    def test_player_stats_readable(self):
         import pandas as pd
-        raw_dir = ROOT / "data" / "nfl" / "raw"
-        first_file = sorted(raw_dir.glob("*.parquet"))[0]
+        stats_dir = ROOT / "data" / "nfl" / "player_stats"
+        first_file = sorted(stats_dir.glob("*.parquet"))[0]
         df = pd.read_parquet(first_file)
         assert len(df) > 0
         assert "player_name" in df.columns

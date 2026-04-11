@@ -1,0 +1,62 @@
+Task 1.5 — Legacy Data Cleanup
+Date: 2026-04-11
+Status: Complete
+Tests: 205 passed, 1 pre-existing failure (unrelated)
+
+Goal
+-----
+Remove all references to deleted legacy data directories (raw/, cleaned/,
+vegas_odds/) and fix broken tests that still pointed to them.
+
+Approach
+--------
+- The three legacy directories were already deleted from disk in a prior
+  session. This task focused on cleaning up stale references in test files.
+- Only modified test files that were actively collected by pytest and
+  either failing or referencing deleted paths. Left historical docs and
+  legacy source code (deferred to Task 2.2) untouched.
+
+Implementation
+--------------
+Deleted:
+- tests/scripts/file_test.py — one-off debug script that loaded a hardcoded
+  raw/ file at import time, causing a pytest collection error
+
+Modified:
+- tests/test_fetch_player_stats.py — removed TestDataMatchesRawFiles class
+  (5 tests). This was a one-time migration validation comparing old per-week
+  raw files against new per-season files. Raw files no longer exist, so these
+  tests were permanently broken. Updated module docstring.
+- tests/test_smoke.py — replaced test_raw_data_exists and test_raw_data_readable
+  with test_player_stats_exist and test_player_stats_readable, pointing to
+  data/nfl/player_stats/ instead of data/nfl/raw/
+- tests/test_pipeline_integration.py — replaced test_raw_player_stats_exist
+  (expected 100+ raw files) with test_player_stats_exist (expects 8 per-season
+  files). Updated test_total_parquet_files to count player_stats/ instead of
+  raw/ and adjusted expected total from 230+ to 100+.
+
+Not changed (intentionally):
+- docs/ references to raw/cleaned/vegas_odds — historical records, accurate
+  for their time
+- src/nfl/features/, src/nfl/odds/, src/nfl/training/ — legacy source code
+  kept as V5 reference, cleanup deferred to Task 2.2
+- tests/scripts/check_features.py, data_explorer.py, feature_viewer.py,
+  validate_predictions.py — standalone scripts not collected by pytest,
+  reference old paths in function bodies (not at import time), will be
+  addressed in Task 2.2
+
+Validation
+----------
+- 205 tests pass, 0 collection errors
+- 1 pre-existing failure: test_ml_models.py::test_walk_forward_validation
+  (KeyError: 'position') — unrelated legacy ML test, will be addressed
+  in Phase 3
+
+Lessons Learned
+---------------
+- One-time migration validation tests (comparing old format vs new format)
+  should be removed once the migration is confirmed and the old data is
+  deleted. Leaving them creates false failures that obscure real issues.
+- Debug scripts in tests/scripts/ that run code at module level (not inside
+  functions) will break pytest collection if their dependencies are removed.
+  Keep throwaway scripts out of the test tree.

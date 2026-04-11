@@ -1,6 +1,6 @@
 """
 Tests for the PlayerStatsFetcher — verifies per-season player stats
-are fetched correctly and match the existing per-week raw files.
+are fetched correctly.
 """
 
 import sys
@@ -97,86 +97,6 @@ class TestPlayerStatsDataQuality:
     def test_load_nonexistent_season_returns_none(self, production_fetcher):
         result = production_fetcher.load_season(1999)
         assert result is None
-
-
-class TestDataMatchesRawFiles:
-    """Verify new per-season files contain all data from old per-week raw files."""
-
-    RAW_DIR = ROOT / "data" / "nfl" / "raw"
-    NEW_DIR = ROOT / "data" / "nfl" / "player_stats"
-
-    def test_2024_regular_season_rows_match(self):
-        """Every row in raw weekly files should exist in the new season file."""
-        new_df = pd.read_parquet(self.NEW_DIR / "player_stats_2024.parquet")
-        # Filter to regular season weeks only (what raw files have)
-        new_regular = new_df[new_df['week'] <= 18]
-
-        raw_total = 0
-        for week in range(1, 19):
-            path = self.RAW_DIR / f"player_stats_2024_week_{week}.parquet"
-            if path.exists():
-                raw_total += len(pd.read_parquet(path))
-
-        assert len(new_regular) == raw_total, (
-            f"Row mismatch: new has {len(new_regular)} regular season rows, "
-            f"raw files have {raw_total}"
-        )
-
-    def test_2024_new_has_more_rows_than_raw(self):
-        """New file should have MORE rows (includes playoffs)."""
-        new_df = pd.read_parquet(self.NEW_DIR / "player_stats_2024.parquet")
-
-        raw_total = 0
-        for week in range(1, 23):
-            path = self.RAW_DIR / f"player_stats_2024_week_{week}.parquet"
-            if path.exists():
-                raw_total += len(pd.read_parquet(path))
-
-        assert len(new_df) >= raw_total, (
-            f"New file ({len(new_df)}) should have >= raw total ({raw_total})"
-        )
-
-    def test_2024_columns_identical(self):
-        """New file should have the same columns as raw files."""
-        new_df = pd.read_parquet(self.NEW_DIR / "player_stats_2024.parquet")
-        raw_df = pd.read_parquet(self.RAW_DIR / "player_stats_2024_week_1.parquet")
-        new_cols = set(new_df.columns)
-        raw_cols = set(raw_df.columns)
-        missing = raw_cols - new_cols
-        assert len(missing) == 0, f"Columns in raw but missing from new: {missing}"
-
-    def test_2024_week1_spot_check_mahomes(self):
-        """Mahomes Week 1 stats should match between raw and new."""
-        new_df = pd.read_parquet(self.NEW_DIR / "player_stats_2024.parquet")
-        raw_df = pd.read_parquet(self.RAW_DIR / "player_stats_2024_week_1.parquet")
-
-        new_mahomes = new_df[
-            (new_df['player_name'] == 'P.Mahomes') & (new_df['week'] == 1)
-        ]
-        raw_mahomes = raw_df[raw_df['player_name'] == 'P.Mahomes']
-
-        assert len(new_mahomes) == 1
-        assert len(raw_mahomes) == 1
-
-        # Fantasy points should match exactly
-        assert new_mahomes.iloc[0]['fantasy_points_ppr'] == raw_mahomes.iloc[0]['fantasy_points_ppr']
-        assert new_mahomes.iloc[0]['passing_yards'] == raw_mahomes.iloc[0]['passing_yards']
-
-    def test_multiple_seasons_raw_rows_preserved(self):
-        """Verify raw data is fully contained in new files for 2020 and 2022."""
-        for season in [2020, 2022]:
-            new_df = pd.read_parquet(self.NEW_DIR / f"player_stats_{season}.parquet")
-            new_regular = new_df[new_df['week'] <= 18]
-
-            raw_total = 0
-            for week in range(1, 19):
-                path = self.RAW_DIR / f"player_stats_{season}_week_{week}.parquet"
-                if path.exists():
-                    raw_total += len(pd.read_parquet(path))
-
-            assert len(new_regular) == raw_total, (
-                f"{season}: new has {len(new_regular)} regular rows, raw has {raw_total}"
-            )
 
 
 class TestPipelineIntegration:

@@ -75,9 +75,9 @@ class TestDataDirectoriesPopulated:
 
     DATA_ROOT = ROOT / "data" / "nfl"
 
-    def test_raw_player_stats_exist(self):
-        files = list((self.DATA_ROOT / "raw").glob("*.parquet"))
-        assert len(files) >= 100, f"Only {len(files)} raw files"
+    def test_player_stats_exist(self):
+        files = list((self.DATA_ROOT / "player_stats").glob("*.parquet"))
+        assert len(files) == 8, f"{len(files)} player stats files (expected 8)"
 
     def test_schedules_exist(self):
         files = list((self.DATA_ROOT / "schedules").glob("*.parquet"))
@@ -114,11 +114,11 @@ class TestDataDirectoriesPopulated:
     def test_total_parquet_files(self):
         """Verify we have the expected total across all datasets."""
         total = 0
-        for subdir in ['raw', 'schedules', 'injuries', 'snap_counts',
-                       'nextgen_stats', 'ff_opportunity', 'pfr_advstats',
-                       'team_stats', 'depth_charts']:
+        for subdir in ['player_stats', 'players', 'schedules', 'injuries',
+                       'snap_counts', 'nextgen_stats', 'ff_opportunity',
+                       'pfr_advstats', 'team_stats', 'depth_charts']:
             path = self.DATA_ROOT / subdir
             if path.exists():
                 total += len(list(path.glob("*.parquet")))
-        # 144 raw + 8 schedules + 8 injuries + 8 snap + 24 ngs + 8 ff + 24 pfr + 8 team + 7 depth = 239+
-        assert total >= 230, f"Only {total} total Parquet files"
+        # 8 player_stats + 1 players + 8 schedules + 8 injuries + 8 snap + 24 ngs + 8 ff + 24 pfr + 8 team + 7 depth = 104
+        assert total >= 100, f"Only {total} total Parquet files"

@@ -3,9 +3,9 @@
 ## Current State
 - V4 production model: 4.26 MAE (17% improvement over V1 baseline)
 - **Phase 0 complete:** 13 datasets fetched, 248 Parquet files, 798,000+ records (2018-2025)
-- **Phase 1 (Tasks 1.0-1.3) complete:** PostgreSQL database with 798,176 rows across 14 tables, verified against NFL.com
-- 10 fetcher classes registered in unified pipeline (`fetch_all()` and `fetch_latest()`)
-- 211 tests across project
+- **Phase 1 complete:** PostgreSQL database with 798,176 rows across 14 tables, verified against NFL.com. `--refresh-db` flag automates DB sync after fetch. Legacy data directories cleaned up.
+- 10 fetcher classes registered in unified pipeline (`fetch_all()`, `fetch_latest()`, `--refresh-db`)
+- 205 tests passing (6 legacy migration tests removed, 1 pre-existing failure in legacy ML code)
 - `app.py` (Streamlit dashboard) is broken — uses legacy pipeline code that was removed. Will be rebuilt in Task 2.3.
 - Project restructured into modular `src/nfl/` sub-packages
 - Full dataset audit — see `docs/AVAILABLE_DATASETS.md`
@@ -258,12 +258,12 @@ Two ID formats exist across our datasets:
 - [x] **Note:** Simpler than true dual-write (modifying 10 fetcher classes). Full reload takes ~10 min but is idempotent and reliable.
 
 ### Task 1.5 — Legacy data cleanup
-- [ ] Delete `data/nfl/raw/` (144 per-week files, replaced by `data/nfl/player_stats/`)
-- [ ] Delete `data/nfl/cleaned/` (empty directory)
-- [ ] Delete `data/nfl/vegas_odds/` (3 files from paid Odds API, replaced by schedule data)
-- [ ] Update `.gitignore` if needed
-- [ ] Verify tests still pass after removal
-- [ ] **Deliverable:** Clean data directory with only current per-season files
+- [x] Delete `data/nfl/raw/` (144 per-week files, replaced by `data/nfl/player_stats/`)
+- [x] Delete `data/nfl/cleaned/` (empty directory)
+- [x] Delete `data/nfl/vegas_odds/` (3 files from paid Odds API, replaced by schedule data)
+- [x] Update `.gitignore` if needed
+- [x] Verify tests still pass after removal
+- [x] **Deliverable:** Clean data directory with only current per-season files
 
 ---
 
