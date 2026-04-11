@@ -1,0 +1,44 @@
+Task 0.8/0.9/0.10 — PFR Advanced Stats Fetcher (Pass + Rush + Rec)
+Date: 2026-04-11
+Status: Complete
+Tests: 15 new (111 total across project)
+
+Goal
+-----
+Pull all 3 PFR Advanced Stats datasets from nflreadpy for seasons 2018-2025.
+These give us pressure rates, bad throw rates, yards before/after contact,
+broken tackles, drop rates, and passer rating when targeted — quality and
+context metrics beyond box scores. Combined into one task since all 3 use
+the same function with different stat_type.
+
+Approach
+--------
+- Used nfl.load_pfr_advstats(seasons, stat_type) for pass/rush/rec.
+- Single PFRAdvStatsFetcher class mirrors NextGenStatsFetcher pattern.
+- One Parquet file per season per type: pfr_{type}_{season}.parquet (24 files).
+- pfr_player_id is the join key — PFR format, same as snap counts.
+
+Implementation
+--------------
+Created:
+- src/nfl/data/fetch_pfr_advstats.py — PFRAdvStatsFetcher class
+- data/nfl/pfr_advstats/ — 24 Parquet files, 59,609 total records
+- tests/test_fetch_pfr_advstats.py — 15 tests across 3 test classes
+
+Modified:
+- src/nfl/data/pipeline.py — registered PFRAdvStatsFetcher, added to fetch_all()
+
+Validation
+----------
+- 24 files created (3 types x 8 seasons). All present.
+- Column counts: pass=24, rush=16, rec=17. Correct.
+- pfr_player_id: 0 nulls across all 3 types.
+- All 8 seasons fetched.
+
+Lessons Learned
+---------------
+- PFR data uses pfr_player_id (same format as snap counts, e.g. "MahoPa00").
+  Two datasets now need PFR→GSIS ID mapping during feature engineering:
+  snap_counts and pfr_advstats. load_players() has both IDs.
+- Skipped 'def' stat_type — defensive player stats aren't relevant for
+  fantasy scoring predictions of offensive skill positions.

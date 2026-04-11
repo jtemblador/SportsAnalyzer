@@ -117,28 +117,28 @@ Every task follows the phase files in `.claude/instructions/`:
 **Goal:** Pull supplementary datasets that add meaningful signal.
 
 ### Task 0.8 — PFR Advanced Stats (Passing)
-- [ ] **Source:** `nfl.load_pfr_advstats(seasons, stat_type='pass')` — 24 columns
-- [ ] **Key data:** `passing_drops`, `passing_drop_pct`, `passing_bad_throws`, `passing_bad_throw_pct`, `times_pressured`, `times_pressured_pct`, `times_hurried`, `times_blitzed`, `times_hit`
-- [ ] Create `src/nfl/data/fetch_pfr_advstats.py` (handles all 3 stat types)
-- [ ] Fetch seasons 2018-2025, save to `data/nfl/pfr_advstats/pfr_pass_{season}.parquet`
-- [ ] Verify: QBs behind bad O-lines should have high `times_pressured_pct` (>30%)
-- [ ] **Deliverable:** QB pressure and accuracy metrics for all seasons
+- [x] **Source:** `nfl.load_pfr_advstats(seasons, stat_type='pass')` — 24 columns
+- [x] **Key data:** `passing_drops`, `passing_drop_pct`, `passing_bad_throws`, `passing_bad_throw_pct`, `times_pressured`, `times_pressured_pct`, `times_hurried`, `times_blitzed`, `times_hit`
+- [x] Create `src/nfl/data/fetch_pfr_advstats.py` (handles all 3 stat types)
+- [x] Fetch seasons 2018-2025, save to `data/nfl/pfr_advstats/pfr_pass_{season}.parquet`
+- [x] Verify: QBs behind bad O-lines should have high `times_pressured_pct` (>30%)
+- [x] **Deliverable:** QB pressure and accuracy metrics for all seasons
 
 ### Task 0.9 — PFR Advanced Stats (Rushing)
-- [ ] **Source:** `nfl.load_pfr_advstats(seasons, stat_type='rush')` — 16 columns
-- [ ] **Key data:** `rushing_yards_before_contact`, `rushing_yards_before_contact_avg`, `rushing_yards_after_contact`, `rushing_yards_after_contact_avg`, `rushing_broken_tackles`
-- [ ] Use the same `src/nfl/data/fetch_pfr_advstats.py` from Task 0.8
-- [ ] Fetch seasons 2018-2025, save to `data/nfl/pfr_advstats/pfr_rush_{season}.parquet`
-- [ ] Verify: elite RBs should have high yards_after_contact_avg (>2.5)
-- [ ] **Deliverable:** RB contact and elusiveness metrics for all seasons
+- [x] **Source:** `nfl.load_pfr_advstats(seasons, stat_type='rush')` — 16 columns
+- [x] **Key data:** `rushing_yards_before_contact`, `rushing_yards_before_contact_avg`, `rushing_yards_after_contact`, `rushing_yards_after_contact_avg`, `rushing_broken_tackles`
+- [x] Use the same `src/nfl/data/fetch_pfr_advstats.py` from Task 0.8
+- [x] Fetch seasons 2018-2025, save to `data/nfl/pfr_advstats/pfr_rush_{season}.parquet`
+- [x] Verify: elite RBs should have high yards_after_contact_avg (>2.5)
+- [x] **Deliverable:** RB contact and elusiveness metrics for all seasons
 
 ### Task 0.10 — PFR Advanced Stats (Receiving)
-- [ ] **Source:** `nfl.load_pfr_advstats(seasons, stat_type='rec')` — 17 columns
-- [ ] **Key data:** `receiving_drop`, `receiving_drop_pct`, `receiving_broken_tackles`, `receiving_int` (INTs on targets), `receiving_rat` (passer rating when targeted)
-- [ ] Use the same `src/nfl/data/fetch_pfr_advstats.py` from Task 0.8
-- [ ] Fetch seasons 2018-2025, save to `data/nfl/pfr_advstats/pfr_rec_{season}.parquet`
-- [ ] Verify: reliable receivers should have drop_pct < 5%
-- [ ] **Deliverable:** WR/TE reliability and target quality metrics for all seasons
+- [x] **Source:** `nfl.load_pfr_advstats(seasons, stat_type='rec')` — 17 columns
+- [x] **Key data:** `receiving_drop`, `receiving_drop_pct`, `receiving_broken_tackles`, `receiving_int` (INTs on targets), `receiving_rat` (passer rating when targeted)
+- [x] Use the same `src/nfl/data/fetch_pfr_advstats.py` from Task 0.8
+- [x] Fetch seasons 2018-2025, save to `data/nfl/pfr_advstats/pfr_rec_{season}.parquet`
+- [x] Verify: reliable receivers should have drop_pct < 5%
+- [x] **Deliverable:** WR/TE reliability and target quality metrics for all seasons
 
 ### Task 0.11 — Team Stats
 - [ ] **Source:** `nfl.load_team_stats(seasons)` — 102 columns
