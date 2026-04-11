@@ -1,0 +1,52 @@
+Task 0.4/0.5/0.6 — Next Gen Stats Fetcher (Passing + Rushing + Receiving)
+Date: 2026-04-11
+Status: Complete
+Tests: 18 new (82 total across project)
+
+Goal
+-----
+Pull all 3 Next Gen Stats datasets from nflreadpy for seasons 2018-2025.
+These give us advanced tracking metrics beyond box scores: time to throw,
+completion percentage above expectation, rush yards over expected,
+receiver separation, and YAC above expectation. Combined into a single
+task since all 3 use the same nflreadpy function with different stat_type.
+
+Approach
+--------
+- Used nfl.load_nextgen_stats(seasons, stat_type) for passing/rushing/receiving.
+- Single NextGenStatsFetcher class handles all 3 types via stat_type parameter.
+- One Parquet file per season per type: ngs_{type}_{season}.parquet (24 files total).
+- Stored data as-is including week 0 (season aggregates). Weekly data is weeks 1+.
+- player_gsis_id is the join key — same GSIS format as player_stats player_id.
+
+Implementation
+--------------
+Created:
+- src/nfl/data/fetch_nextgen_stats.py — NextGenStatsFetcher class
+- data/nfl/nextgen_stats/ — 24 Parquet files, 21,378 total records
+- tests/test_fetch_nextgen_stats.py — 18 tests across 4 test classes
+
+Modified:
+- src/nfl/data/pipeline.py — registered NextGenStatsFetcher, added to fetch_all()
+
+Validation
+----------
+- 24 files created (3 types x 8 seasons). All present.
+- Column counts: passing=29, rushing=22, receiving=23. Correct.
+- Mahomes 2024 avg_time_to_throw: 2.72s (expected range 2.5-3.5s). Correct.
+- Top RYOE 2024: Derrick Henry (561.9), Saquon Barkley (546.0). Correct.
+- player_gsis_id: 0 nulls across all 3 types. Clean join key.
+- Week 0 confirmed as season aggregate (Herbert: 504 attempts vs ~25 weekly).
+
+Lessons Learned
+---------------
+- Week 0 is a full-season aggregate, not a game. Useful for season-level features.
+  Filter to week > 0 for per-game features during feature engineering.
+- NGS data only covers qualified players (min attempts/targets threshold).
+  Low-volume players won't have NGS rows — handle with fallback to league
+  averages during feature engineering.
+- player_gsis_id matches player_stats player_id format (00-XXXXXXX).
+  This is different from snap counts which use pfr_player_id. Will need
+  ID mapping for snap counts but not for NGS.
+- Some weeks are missing in playoffs (e.g., week 22 jumps to 23 in 2024).
+  This is normal playoff scheduling, not missing data.

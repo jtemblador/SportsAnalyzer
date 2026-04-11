@@ -79,28 +79,28 @@ Every task follows the phase files in `.claude/instructions/`:
 - [x] **Deliverable:** Snap participation data for all players, all seasons
 
 ### Task 0.4 — Next Gen Stats (Passing)
-- [ ] **Source:** `nfl.load_nextgen_stats(seasons, stat_type='passing')` — 29 columns
-- [ ] **Key data:** `avg_time_to_throw`, `avg_completed_air_yards`, `avg_intended_air_yards`, `aggressiveness`, `completion_percentage_above_expectation`, `expected_completion_percentage`, `max_completed_air_distance`
-- [ ] Create `src/nfl/data/fetch_nextgen_stats.py` (handles all 3 stat types)
-- [ ] Fetch seasons 2018-2025, save to `data/nfl/nextgen_stats/ngs_passing_{season}.parquet`
-- [ ] Verify: check a known QB has reasonable values (Mahomes time_to_throw ~2.5-3.0s)
-- [ ] **Deliverable:** QB-level Next Gen passing metrics for all seasons
+- [x] **Source:** `nfl.load_nextgen_stats(seasons, stat_type='passing')` — 29 columns
+- [x] **Key data:** `avg_time_to_throw`, `avg_completed_air_yards`, `avg_intended_air_yards`, `aggressiveness`, `completion_percentage_above_expectation`, `expected_completion_percentage`, `max_completed_air_distance`
+- [x] Create `src/nfl/data/fetch_nextgen_stats.py` (handles all 3 stat types)
+- [x] Fetch seasons 2018-2025, save to `data/nfl/nextgen_stats/ngs_passing_{season}.parquet`
+- [x] Verify: check a known QB has reasonable values (Mahomes time_to_throw ~2.5-3.0s)
+- [x] **Deliverable:** QB-level Next Gen passing metrics for all seasons
 
 ### Task 0.5 — Next Gen Stats (Rushing)
-- [ ] **Source:** `nfl.load_nextgen_stats(seasons, stat_type='rushing')` — 22 columns
-- [ ] **Key data:** `efficiency`, `avg_time_to_los`, `rush_yards_over_expected`, `rush_yards_over_expected_per_att`, `rush_pct_over_expected`, `percent_attempts_gte_eight_defenders`
-- [ ] Use the same `src/nfl/data/fetch_nextgen_stats.py` from Task 0.4
-- [ ] Fetch seasons 2018-2025, save to `data/nfl/nextgen_stats/ngs_rushing_{season}.parquet`
-- [ ] Verify: top RBs should have positive `rush_yards_over_expected`
-- [ ] **Deliverable:** RB-level Next Gen rushing metrics for all seasons
+- [x] **Source:** `nfl.load_nextgen_stats(seasons, stat_type='rushing')` — 22 columns
+- [x] **Key data:** `efficiency`, `avg_time_to_los`, `rush_yards_over_expected`, `rush_yards_over_expected_per_att`, `rush_pct_over_expected`, `percent_attempts_gte_eight_defenders`
+- [x] Use the same `src/nfl/data/fetch_nextgen_stats.py` from Task 0.4
+- [x] Fetch seasons 2018-2025, save to `data/nfl/nextgen_stats/ngs_rushing_{season}.parquet`
+- [x] Verify: top RBs should have positive `rush_yards_over_expected`
+- [x] **Deliverable:** RB-level Next Gen rushing metrics for all seasons
 
 ### Task 0.6 — Next Gen Stats (Receiving)
-- [ ] **Source:** `nfl.load_nextgen_stats(seasons, stat_type='receiving')` — 23 columns
-- [ ] **Key data:** `avg_cushion`, `avg_separation`, `avg_intended_air_yards`, `catch_percentage`, `avg_yac_above_expectation`, `avg_expected_yac`, `percent_share_of_intended_air_yards`
-- [ ] Use the same `src/nfl/data/fetch_nextgen_stats.py` from Task 0.4
-- [ ] Fetch seasons 2018-2025, save to `data/nfl/nextgen_stats/ngs_receiving_{season}.parquet`
-- [ ] Verify: elite WRs should have high separation (~3.0+) and positive YAC above expectation
-- [ ] **Deliverable:** WR/TE-level Next Gen receiving metrics for all seasons
+- [x] **Source:** `nfl.load_nextgen_stats(seasons, stat_type='receiving')` — 23 columns
+- [x] **Key data:** `avg_cushion`, `avg_separation`, `avg_intended_air_yards`, `catch_percentage`, `avg_yac_above_expectation`, `avg_expected_yac`, `percent_share_of_intended_air_yards`
+- [x] Use the same `src/nfl/data/fetch_nextgen_stats.py` from Task 0.4
+- [x] Fetch seasons 2018-2025, save to `data/nfl/nextgen_stats/ngs_receiving_{season}.parquet`
+- [x] Verify: elite WRs should have high separation (~3.0+) and positive YAC above expectation
+- [x] **Deliverable:** WR/TE-level Next Gen receiving metrics for all seasons
 
 ### Task 0.7 — Fantasy Opportunity (Expected Fantasy Points)
 - [ ] **Source:** `nfl.load_ff_opportunity(seasons)` — 159 columns
