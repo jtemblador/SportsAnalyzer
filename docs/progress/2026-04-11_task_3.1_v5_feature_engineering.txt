@@ -171,3 +171,53 @@ Remaining Risks / Deferred
 Handoff: User runs colab/v5_feature_engineering.ipynb on Colab Pro (high-RAM
 CPU runtime) with data uploaded to Drive. Expected runtime ~30-60 min for
 all 8 seasons. Output goes to Drive /output/features/v5/features_{season}.parquet.
+
+Production Run Results (2026-04-12)
+------------------------------------
+Colab run completed successfully. All 8 seasons generated and downloaded
+to data/nfl/features/v5/ locally.
+
+Per-season output:
+  2018: 6,114 rows, 1.5 MB
+  2019: 6,166 rows, 1.7 MB
+  2020: 6,338 rows, 1.8 MB
+  2021: 6,690 rows, 1.9 MB
+  2022: 6,662 rows, 1.9 MB
+  2023: 6,650 rows, 1.9 MB
+  2024: 6,692 rows, 1.8 MB
+  2025: 6,895 rows, 1.9 MB
+  Total: 52,207 rows across 8 seasons (14.4 MB)
+
+Mahomes 2024 W5 spot check (on production output):
+  rolling_avg_passing_yards:      240.4 (within 200-280 expected)
+  rolling_avg_fantasy_points_ppr: 15.9  (within 15-22 expected)
+  games_of_history:               44    (higher than local test's 24 — because
+                                         production used 2018-2023 as warm-up)
+  game_script_index:              -5.5  (KC favored by 5.5 pts — realistic)
+  injury_severity:                0     (healthy)
+
+Feature group counts on 2024 production output:
+  rolling: 43 cols
+  context: 20 cols
+  usage:   4 cols
+  advanced: 23 cols
+  Total: 90 feature columns (exceeds 60-80 plan target)
+
+Minor schema quirk discovered: 2018-2021 have 237 columns, 2022-2025 have 238.
+The extra column in 2022+ is `game_id`, a metadata column (nflverse added
+game_id to player_stats starting 2022). NOT a feature column — the 90
+engineered feature columns are identical across all seasons. Training
+will filter to feature columns via get_feature_columns_by_group(), so
+this metadata difference has zero downstream impact. Flagged for future
+schema cleanup if we ever need strict column alignment.
+
+Validation against 8-season production output:
+  - All 15 non-skipped real-data tests passed (1 skip is Barkley bye week,
+    not a bug)
+  - Column consistency verified: feature columns identical across seasons
+  - Multi-player spot check (Mahomes/Barkley/Kelce 2024 W10): all correct
+    positions, games_of_history growing (40-48 by W10), no anomalies
+  - Row counts sensible: 6K-6.9K per season, slight growth from league
+    expansion (more players reaching minimum snap counts over time)
+
+Ready for Task 3.2 (model training).

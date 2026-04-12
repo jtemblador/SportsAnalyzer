@@ -398,7 +398,7 @@ Notebooks are created per handoff (see each task below). Notebooks are **gitigno
 - [x] `FEATURE_GROUP_PREFIXES` + `get_feature_columns_by_group()` helper for Task 3.2b ablation
 - [x] Colab notebook `colab/v5_feature_engineering.ipynb` with Drive mount + high-RAM check + spot-check cell
 - [x] **Delivered:** 90 feature columns on 2024 data in 16s, 295 tests passing
-- [x] **HANDOFF POINT #1:** User runs `colab/v5_feature_engineering.ipynb` on Colab Pro (high-RAM CPU). Expected 30-60 min for all 8 seasons. Output to Drive `/output/features/v5/`.
+- [x] **HANDOFF POINT #1 COMPLETE:** Colab run successful. 8 per-season Parquets generated (52,207 total rows, 14.4 MB) and downloaded to `data/nfl/features/v5/`. Production validation: 90 feature columns, Mahomes W5 rolling_avg_passing_yards=240.4, all data leakage tests passed.
 
 ### Task 3.1b — Feature validation (**Quick** — spot-check pass) ✅ COMPLETE
 - [x] No data leakage verified (W1 of first season has NaN opp_def_rank; Mahomes W1 rolling_avg ≠ current stat)
