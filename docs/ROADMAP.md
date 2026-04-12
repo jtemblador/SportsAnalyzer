@@ -301,38 +301,94 @@ Two ID formats exist across our datasets:
 
 ---
 
-## Phase 3: V5 Model Improvements
-**Goal:** Use all new data sources + database to improve MAE below 4.0.
+## Phase 3: V5 Model — Feature Engineering, Training, and Validation
+**Goal:** Use all 13 data sources + PostgreSQL to build V5 model. Target MAE < 4.0. See `docs/V5_QUESTIONS.md` for full architectural decisions.
 
-### Task 3.1 — V5 feature engineering
-- [ ] Build new features from the expanded datasets:
-  - **From schedules:** implied team total, spread, weather features (wind, temp, dome), rest days, divisional game flag
-  - **From injuries:** teammate injury impact (is WR1 out? is starting QB out?), player's own injury status
-  - **From snap counts:** snap share trend, snap share vs team average
-  - **From NGS passing:** time to throw, CPOE, aggressiveness, air yards differential
-  - **From NGS rushing:** rush yards over expected, efficiency, stacked box %
-  - **From NGS receiving:** separation, YAC above expected, cushion, air yards share
-  - **From FF opportunity:** expected fantasy points, actual vs expected differential, team fantasy share
-  - **From PFR pass:** pressure rate, blitz rate, bad throw rate
-  - **From PFR rush:** yards after contact avg, broken tackles per attempt
-  - **From PFR rec:** drop rate, passer rating when targeted
-  - **From team stats:** opponent offensive/defensive EPA, opponent pass/rush EPA
-  - **From depth charts:** starter/backup flag, depth chart changes week-over-week
-- [ ] Target: 70-80 features (up from V4's 50)
-- [ ] **Deliverable:** V5 feature engineer in `src/nfl/features/v5_engineer.py`
+**Key V5 decisions:**
+- Predict individual stats per position (not just fantasy_points_ppr) — dashboard shows per-stat over/under
+- 2 model types: StatPredictor (raw prediction) + POB (over/under probability). EVOB dropped.
+- 4-algorithm ensemble: XGBoost, LightGBM, CatBoost, RandomForest
+- Pre-game features only (no data leakage)
+- Bulk SQL pipeline, not per-player loops
+- Walk-forward validation, then ablation study to prove which features helped
 
-### Task 3.2 — V5 model training and evaluation
-- [ ] Train V5 models with expanded feature set
-- [ ] Compare MAE against V4 (4.26) per position
-- [ ] Feature importance analysis — which new datasets helped most?
-- [ ] Position-specific tuning
-- [ ] **Target MAE:** < 4.0
+### Task 3.1 — V5 feature engineering (**Heavy** — largest task in Phase 3)
+- [ ] Create `src/nfl/features/v5_engineer.py` with batch SQL pipeline
+- [ ] Build **master player-week table** via SQL joins:
+  - Start from `weekly_stats` → LEFT JOIN `players` (get PFR ID) → LEFT JOIN all other datasets
+  - GSIS↔PFR ID mapping happens once at the join level
+  - Result: one row per player per week with all available data
+- [ ] Carry forward proven V4 features:
+  - Rolling averages (decay=0.85, recent 3 games = 60.7% weight)
+  - Variance/boom-bust metrics (V2 — TE improved 42%)
+  - Usage trend features (target share momentum, carry trend)
+  - Vegas features (implied total, spread, game script index — strongest single feature)
+  - Opponent defense rank against position
+- [ ] Add new features from expanded datasets:
+  - **High confidence:** snap count offense_pct + snap trend, player injury status, rest days, home/away, dome flag
+  - **Medium confidence:** FF opportunity expected points + differential, teammate injury impact, depth chart starter flag, weather (wind/temp)
+  - **Lower confidence (test, ready to drop):** NGS metrics (time to throw, separation, rush efficiency), PFR advanced (pressure rate, drop rate, yards after contact)
+  - **Avoid:** team-level EPA (V3 proved EPA doesn't help)
+- [ ] Handle sparse data: NULLs for NGS/PFR where player isn't qualified — tree models handle natively
+- [ ] Handle rookies: position-average baselines, 3-game minimum for predictions
+- [ ] Pre-game features only: rolling stats, Vegas lines, injury reports, snap trends — NO current-game data
+- [ ] Target: 60-80 features per position (up from V4's 50)
+- [ ] **Deliverable:** `v5_engineer.py` with `build_features(season, week)` → DataFrame for all players
 
-### Task 3.3 — Prediction accuracy dashboard
-- [ ] New Streamlit tab: model accuracy over time, by position, by version
-- [ ] Powered by SQL queries joining predictions with actuals
-- [ ] Visual: predicted vs actual scatter plots, MAE trend charts
-- [ ] **Deliverable:** Interactive accuracy comparison across V1-V5
+### Task 3.1b — Feature validation (**Quick** — spot-check pass)
+- [ ] Verify no data leakage: features for week N only use data from weeks < N
+- [ ] Check for NaN explosions: no feature column is >50% NULL for starting players
+- [ ] Spot-check known players: Mahomes rolling avg, Barkley snap trend, etc.
+- [ ] Verify feature column count matches expectations per position
+- [ ] **Deliverable:** Validated feature set ready for training
+
+### Task 3.2 — V5 model training (**Heavy** — compute-intensive, ~20-30 min per full run)
+- [ ] Create `src/nfl/training/v5_train.py`
+- [ ] Train per-position models: StatPredictor + POB for each stat
+  - QB: passing_yards, passing_tds, passing_interceptions, rushing_yards, rushing_tds (5 stats × 2 types = 10 models)
+  - RB: rushing_yards, rushing_tds, receptions, receiving_yards, receiving_tds (5 × 2 = 10)
+  - WR: receptions, receiving_yards, receiving_tds, targets (4 × 2 = 8)
+  - TE: receptions, receiving_yards, receiving_tds, targets (4 × 2 = 8)
+  - K: fg_made, fg_att, pat_made (3 × 2 = 6)
+  - **Total: ~42 models** (similar to V4's 40)
+- [ ] Position-specific hyperparameters (from V4): QB depth=9, RB/WR depth=7, TE depth=6, K depth=3
+- [ ] Expanding-window walk-forward validation: train on prior data, predict each week for 2021-2024
+- [ ] Compute per-stat and per-position MAE, compare against V4
+- [ ] Generate feature importance rankings per position
+- [ ] **Deliverable:** Trained V5 models in `data/nfl/models/v5/`, MAE results documented
+
+### Task 3.2b — Ablation study (**Heavy** — retrains model ~8-10 times)
+- [ ] Remove one feature group at a time, retrain, measure MAE change:
+  - Remove snap count features → measure impact
+  - Remove injury features → measure impact
+  - Remove NGS features → measure impact
+  - Remove PFR features → measure impact
+  - Remove FF opportunity features → measure impact
+  - Remove weather features → measure impact
+  - Remove depth chart features → measure impact
+- [ ] Any feature group that improves MAE by < 0.05 when included → drop it
+- [ ] Document results: "snap counts improved RB MAE by X, NGS had no measurable impact"
+- [ ] **Deliverable:** Validated feature set — only features that proved their value remain
+
+### Task 3.2c — Final V5 retrain (**Medium** — one training run with finalized features)
+- [ ] Retrain V5 with ablation-validated feature set (noise features removed)
+- [ ] Train production model on all 2020-2025 data
+- [ ] Generate predictions for 2025 season (for comparison with V1-V4)
+- [ ] Load V5 predictions into `predictions` table (reuse `load_predictions.py`)
+- [ ] Compare V5 vs V4 MAE in database: `SELECT version, AVG(error) ... GROUP BY version`
+- [ ] **Deliverable:** Final V5 model, predictions loaded, cross-version accuracy verified
+- [ ] **Target MAE:** < 4.0 overall (TE < 3.5, RB < 4.5, WR < 4.5, QB < 6.5)
+
+### Task 3.3 — Prediction accuracy dashboard (**Medium** — visualization work)
+- [ ] New Streamlit page or tab: model accuracy comparison
+- [ ] Powered by SQL queries on predictions table (already has actuals + errors)
+- [ ] Charts:
+  - MAE by version (bar chart: V1 → V5)
+  - MAE by position by version (grouped bar chart)
+  - Predicted vs actual scatter plot (by position, filterable by version)
+  - Per-week MAE trend line (does accuracy degrade later in season?)
+  - Feature importance bar chart (from ablation results)
+- [ ] **Deliverable:** Interactive accuracy dashboard comparing V1-V5
 
 ---
 
