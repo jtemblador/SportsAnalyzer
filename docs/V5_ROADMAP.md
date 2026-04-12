@@ -5,8 +5,9 @@
 - **Phase 0 complete:** 13 datasets fetched, 248 Parquet files, 798,000+ records (2018-2025)
 - **Phase 1 complete:** PostgreSQL database with 798,176 rows across 14 tables, verified against NFL.com. `--refresh-db` flag automates DB sync after fetch.
 - **Phase 2 complete:** SQL query layer (7 functions), legacy code in `legacy/v1-v4/`, 65,921 predictions loaded with cross-version accuracy queries
+- **Phase 3 Task 3.1 complete:** V5 feature engineer at `src/nfl/features/v5/` producing 90 feature columns on 2024 data in 16s (7 modules, 2 review passes, 51 V5 tests)
 - 10 fetcher classes registered in unified pipeline (`fetch_all()`, `fetch_latest()`, `--refresh-db`)
-- 244 tests passing, 0 failures
+- 295 tests passing, 0 failures
 - `app.py` (Streamlit dashboard) is broken — will be rebuilt in Task 4.1
 - Project restructured: active code in `src/nfl/` (data + db), V1-V4 ML code in `legacy/v1-v4/`
 - Full V4 codebase tagged as `v4-final` for reproducibility
@@ -367,48 +368,44 @@ SportsAnalyzer/
 - [x] Create `scripts/` and `output/` folders in Drive
 - [x] Test Colab connection from VS Code, verify Drive mount works (`colab/colab_test.ipynb` passed)
 
-### Task 3.0 — Colab notebooks (create alongside each Phase 3 task)
+### Task 3.0 — Colab notebooks (created alongside each Phase 3 task)
 
-Notebooks live in `colab/` locally (for version control) and get copied to Drive before each run.
+Notebooks are created per handoff (see each task below). Notebooks are **gitignored** (`colab/*.ipynb`) — they're throwaway runners that live on Drive. The `.py` scripts in `src/` contain all logic; notebooks are thin wrappers that mount Drive and invoke the script.
+
+**Every notebook MUST include these cells in order:**
+1. Mount Google Drive
+2. Set paths (DRIVE_ROOT, DATA_DIR, OUTPUT_DIR, CODE_ROOT)
+3. Verify code uploaded + create `__init__.py` files if missing
+4. **High-RAM / CPU sanity check** — warn if `psutil.virtual_memory().total < 20GB`. This prevents wasted compute on free-tier runtimes.
+5. Run the script (via `%run` or direct import)
+6. Verify outputs (file sizes, row counts)
+7. Spot-check known values (Mahomes W5 rolling avg, etc.)
 
 - [x] `colab/colab_test.ipynb` — verify Drive mount + data access + ML libraries
-- [ ] `colab/v5_feature_engineering.ipynb` — runs feature engineering script (paired with Task 3.1)
+- [x] `colab/v5_feature_engineering.ipynb` — runs feature engineering (paired with Task 3.1)
 - [ ] `colab/v5_training.ipynb` — runs training script (paired with Task 3.2)
 - [ ] `colab/v5_ablation.ipynb` — runs ablation study script (paired with Task 3.2b)
 - [ ] `colab/v5_final_retrain.ipynb` — runs final retrain + prediction generation (paired with Task 3.2c)
 
-Each notebook follows the same pattern: mount Drive → install any missing libs → `%run scripts/<script>.py` → save output to Drive. The `.py` scripts contain all the logic; notebooks are thin wrappers.
+### Task 3.1 — V5 feature engineering (**Heavy** — largest task in Phase 3) ✅ COMPLETE
+- [x] Created `src/nfl/features/v5/` package (7 modules instead of monolith): config, master_table, rolling, context, usage, advanced, engineer
+- [x] Master player-week table with 13 LEFT JOINs (GSIS↔PFR mapping at join level, position filter drops 65% of non-skill-position rows, drop_duplicates guards)
+- [x] Carried forward proven V4 features (rolling decay=0.85, variance, trends, Vegas, opponent rank)
+- [x] Added new features: snap counts, injury severity, depth chart, weather (dome/wind/cold), NGS (passing/rushing/receiving), PFR advanced (pass/rush/rec), FF opportunity
+- [x] Pre-game features only (strict shift(1) + week < N enforcement, verified via 16 real-data tests)
+- [x] NULL preservation for unqualified players (no fake imputation)
+- [x] `games_of_history` column enables downstream MIN_GAMES_HISTORY filtering
+- [x] `FEATURE_GROUP_PREFIXES` + `get_feature_columns_by_group()` helper for Task 3.2b ablation
+- [x] Colab notebook `colab/v5_feature_engineering.ipynb` with Drive mount + high-RAM check + spot-check cell
+- [x] **Delivered:** 90 feature columns on 2024 data in 16s, 295 tests passing
+- [x] **HANDOFF POINT #1:** User runs `colab/v5_feature_engineering.ipynb` on Colab Pro (high-RAM CPU). Expected 30-60 min for all 8 seasons. Output to Drive `/output/features/v5/`.
 
-### Task 3.1 — V5 feature engineering (**Heavy** — largest task in Phase 3)
-- [ ] Create `src/nfl/features/v5_engineer.py` with batch SQL pipeline
-- [ ] Build **master player-week table** via SQL joins:
-  - Start from `weekly_stats` → LEFT JOIN `players` (get PFR ID) → LEFT JOIN all other datasets
-  - GSIS↔PFR ID mapping happens once at the join level
-  - Result: one row per player per week with all available data
-- [ ] Carry forward proven V4 features:
-  - Rolling averages (decay=0.85, recent 3 games = 60.7% weight)
-  - Variance/boom-bust metrics (V2 — TE improved 42%)
-  - Usage trend features (target share momentum, carry trend)
-  - Vegas features (implied total, spread, game script index — strongest single feature)
-  - Opponent defense rank against position
-- [ ] Add new features from expanded datasets:
-  - **High confidence:** snap count offense_pct + snap trend, player injury status, rest days, home/away, dome flag
-  - **Medium confidence:** FF opportunity expected points + differential, teammate injury impact, depth chart starter flag, weather (wind/temp)
-  - **Lower confidence (test, ready to drop):** NGS metrics (time to throw, separation, rush efficiency), PFR advanced (pressure rate, drop rate, yards after contact)
-  - **Avoid:** team-level EPA (V3 proved EPA doesn't help)
-- [ ] Handle sparse data: NULLs for NGS/PFR where player isn't qualified — tree models handle natively
-- [ ] Handle rookies: position-average baselines, 3-game minimum for predictions
-- [ ] Pre-game features only: rolling stats, Vegas lines, injury reports, snap trends — NO current-game data
-- [ ] Target: 60-80 features per position (up from V4's 50)
-- [ ] **Deliverable:** `v5_engineer.py` with `build_features(season, week)` → DataFrame for all players
-- **>>> HANDOFF POINT #1:** After code is written, user runs `v5_engineer.py` to generate feature files for all seasons (estimated 4-5 hours). Claude resumes after features are on disk.
-
-### Task 3.1b — Feature validation (**Quick** — spot-check pass)
-- [ ] Verify no data leakage: features for week N only use data from weeks < N
-- [ ] Check for NaN explosions: no feature column is >50% NULL for starting players
-- [ ] Spot-check known players: Mahomes rolling avg, Barkley snap trend, etc.
-- [ ] Verify feature column count matches expectations per position
-- [ ] **Deliverable:** Validated feature set ready for training
+### Task 3.1b — Feature validation (**Quick** — spot-check pass) ✅ COMPLETE
+- [x] No data leakage verified (W1 of first season has NaN opp_def_rank; Mahomes W1 rolling_avg ≠ current stat)
+- [x] NGS/PFR nulls preserved as expected (90%+ non-QBs have NaN NGS passing)
+- [x] Spot-checked Mahomes (240.35 rolling passing yds, 24 games_of_history), Barkley, Kelce
+- [x] 90 feature columns total (rolling 43, context 20, usage 4, advanced 23) — exceeds 60-80 plan target
+- [x] **Deliverable:** Real-data integration tests in `tests/test_v5_real_data.py` (16 tests)
 
 ### Task 3.2 — V5 model training (**Heavy** — compute-intensive, ~20-30 min per full run)
 - [ ] Create `src/nfl/training/v5_train.py`
@@ -423,8 +420,9 @@ Each notebook follows the same pattern: mount Drive → install any missing libs
 - [ ] Expanding-window walk-forward validation: train on prior data, predict each week for 2021-2024
 - [ ] Compute per-stat and per-position MAE, compare against V4
 - [ ] Generate feature importance rankings per position
+- [ ] Create `colab/v5_training.ipynb` with required cells: mount Drive, paths, **high-RAM/CPU check (`psutil.virtual_memory().total >= 20GB` assertion)**, install catboost/xgboost/lightgbm if needed, `%run v5_train.py`, verify output models, print MAE summary
 - [ ] **Deliverable:** Trained V5 models in `data/nfl/models/v5/`, MAE results documented
-- **>>> HANDOFF POINT #2:** After training script is written, user runs `v5_train.py` to train all models (estimated 1-4 hours depending on machine). Claude resumes to analyze results.
+- **>>> HANDOFF POINT #2:** User runs `colab/v5_training.ipynb` on Colab Pro (high-RAM CPU). Estimated 1-4 hours. Claude resumes to analyze results.
 
 ### Task 3.2b — Ablation study (**Heavy** — retrains model ~8-10 times)
 - [ ] Remove one feature group at a time, retrain, measure MAE change:
@@ -437,8 +435,9 @@ Each notebook follows the same pattern: mount Drive → install any missing libs
   - Remove depth chart features → measure impact
 - [ ] Any feature group that improves MAE by < 0.05 when included → drop it
 - [ ] Document results: "snap counts improved RB MAE by X, NGS had no measurable impact"
+- [ ] Create `colab/v5_ablation.ipynb` with required cells: mount Drive, paths, **high-RAM/CPU check**, install ML libs, `%run v5_ablation.py`, summarize MAE deltas per feature group
 - [ ] **Deliverable:** Validated feature set — only features that proved their value remain
-- **>>> HANDOFF POINT #3:** User runs ablation script (retrains ~8-10 times, estimated 8-30 hours total). Claude resumes to analyze results and decide which features to keep.
+- **>>> HANDOFF POINT #3:** User runs `colab/v5_ablation.ipynb` (retrains ~8-10 times, estimated 8-30 hours total — consider Colab Pro+ for background execution). Claude resumes to analyze results.
 
 ### Task 3.2c — Final V5 retrain (**Medium** — one training run with finalized features)
 - [ ] Retrain V5 with ablation-validated feature set (noise features removed)
@@ -446,9 +445,10 @@ Each notebook follows the same pattern: mount Drive → install any missing libs
 - [ ] Generate predictions for 2025 season (for comparison with V1-V4)
 - [ ] Load V5 predictions into `predictions` table (reuse `load_predictions.py`)
 - [ ] Compare V5 vs V4 MAE in database: `SELECT version, AVG(error) ... GROUP BY version`
+- [ ] Create `colab/v5_final_retrain.ipynb` with required cells: mount Drive, paths, **high-RAM/CPU check**, install ML libs, `%run v5_final_retrain.py`, save models + predictions to Drive
 - [ ] **Deliverable:** Final V5 model, predictions loaded, cross-version accuracy verified
 - [ ] **Target MAE:** < 4.0 overall (TE < 3.5, RB < 4.5, WR < 4.5, QB < 6.5)
-- **>>> HANDOFF POINT #4:** User runs final training + prediction generation (estimated 1-2 hours). Claude resumes to load results into DB and verify.
+- **>>> HANDOFF POINT #4:** User runs `colab/v5_final_retrain.ipynb` (estimated 1-2 hours). Claude resumes to load results into DB and verify.
 
 ### Task 3.3 — Prediction accuracy dashboard (**Medium** — visualization work)
 - [ ] New Streamlit page or tab: model accuracy comparison

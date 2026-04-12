@@ -26,6 +26,10 @@ wheels/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# Colab runner notebooks — throwaway wrappers that live on Drive, not in git
+# (keep colab/README.md tracked for documentation)
+colab/*.ipynb
+
 # pyenv
 .python-version
 

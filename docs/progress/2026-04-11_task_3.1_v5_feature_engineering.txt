@@ -1,0 +1,173 @@
+Task 3.1 — V5 Feature Engineering
+Date: 2026-04-11
+Status: Code complete, ready for Colab production run (handoff point)
+Tests: 295 passed, 0 failures (up from 244)
+Commits: b924994, da783d9, dedcafe, ad5c011, 202e9be, 43f3b89, 4370eab, 42219f4 (build) + d06d83a, 5362711 (review fixes) + 885bb82 (real-data tests)
+
+Goal
+-----
+Build src/nfl/features/v5/ package that transforms raw NFL Parquet data into
+60-80 predictive features per player per week, feeding the V5 model training
+(Task 3.2). Must run on Google Colab (reads Parquet, not PostgreSQL) to
+leverage high-RAM cloud CPUs for the 8-season batch.
+
+Approach
+--------
+1. Package structure, not monolith: 7 focused files (config, master_table,
+   rolling, context, usage, advanced, engineer). Each < 300 lines. V4's
+   legacy/v1-v4/features/v4_engineer.py was one 600-line monolith — we
+   split to keep each concern independently testable.
+
+2. Master player-week table approach: Build one DataFrame via 13 LEFT JOINs
+   (schedules, injuries, snap_counts, NGS passing/rushing/receiving, PFR
+   pass/rush/rec, FF opportunity, depth_charts, team_stats, players). Each
+   feature module then computes derived features from this single table,
+   using vectorized pandas operations.
+
+3. GSIS ↔ PFR ID mapping once at the join level: snap_counts and pfr_advstats
+   use PFR IDs; everything else uses GSIS. The master table joins through
+   the players table once so downstream feature code is ID-agnostic.
+
+4. Subagent-driven TDD build: 8 bite-sized tasks, each with write-failing-
+   test → implement → verify-pass → commit. Fresh subagent per task to
+   preserve context and enable parallel review.
+
+5. Two review passes: First pass caught FK ordering + kicker pipeline gap.
+   Second pass caught 4 more (position filter, games_of_history, feature
+   groups, schema consistency). All fixed before handoff.
+
+Key V5 decisions (from docs/V5_QUESTIONS.md)
+--------------------------------------------
+- Predict individual stats per position (not fantasy_points_ppr directly).
+  Dashboard shows per-stat over/under. Fantasy points computed from sum.
+- 2 model types (StatPredictor + POB). Dropped EVOB (redundant).
+- Pre-game features only. No current-week data used (strict shift/expand).
+- Parquet-first, no DB dependency. Runs on Colab without PostgreSQL.
+- Cross-season rolling is INTENTIONAL. 2018-2019 warm-up data so week 1
+  of 2020 has a full lookback window. Player identity carries across
+  season boundaries.
+- Position filter at master-table level: drop LB/CB/DL/OL/etc. (65% of
+  rows). Only QB/RB/WR/TE/K enter the feature pipeline.
+- NULL preservation for NGS/PFR coverage gaps. Tree-based models handle
+  NULLs natively — imputing 0 would lie about what we know.
+
+Implementation
+--------------
+Created:
+- src/nfl/features/v5/__init__.py — exports build_features, VERSION
+- src/nfl/features/v5/config.py — STATS_TO_PREDICT per position,
+  CORE_STATS_FOR_ROLLING (including kickers), FANTASY_PPR_WEIGHTS for
+  derived fantasy scoring, FEATURE_GROUP_PREFIXES for ablation study,
+  get_feature_columns_by_group() helper, MIN_GAMES_HISTORY, ROLLING_DECAY
+- src/nfl/features/v5/master_table.py — 13-dataset LEFT JOIN builder
+  (~220 lines). Position filter at start. drop_duplicates guards on
+  snap_counts, NGS, PFR, injuries, depth_charts before every merge.
+- src/nfl/features/v5/rolling.py — decay-weighted avg (0.85), variance,
+  trend features per core stat. games_of_history column.
+- src/nfl/features/v5/context.py — Vegas (game_script_index,
+  total_game_points), weather (is_dome, is_high_wind, is_cold),
+  opponent defense rank per position (prior weeks only).
+- src/nfl/features/v5/usage.py — rolling snap share, prior-week snap pct,
+  injury severity encoding, depth chart starter flag.
+- src/nfl/features/v5/advanced.py — rolling averages for 10 NGS columns,
+  8 PFR columns, 5 FF opportunity columns.
+- src/nfl/features/v5/engineer.py — orchestrator with build_features()
+  entry point. Docstring clarifies: training data only, inference
+  pipeline is a separate future concern.
+
+- colab/v5_feature_engineering.ipynb — Colab notebook wrapper. Mounts
+  Drive, verifies code uploaded, checks RAM (warns if not high-RAM),
+  runs build_features on all 8 seasons, saves per-season Parquets.
+
+- tests/test_v5_config.py (6 tests), test_v5_master_table.py (6),
+  test_v5_rolling.py (7), test_v5_context.py (3), test_v5_usage.py (4),
+  test_v5_advanced.py (3), test_v5_engineer.py (6), test_v5_real_data.py
+  (16 real-data integration tests with Mahomes/Barkley/Kelce spot checks).
+
+Validation
+----------
+Unit tests: 280 passing on synthetic fixtures.
+
+Real-data integration (tests/test_v5_real_data.py on actual 2023-2024 data):
+- 2024 season alone: 16.2s, 6,692 rows × 237 columns
+- 2023+2024 combined: 13,342 rows × 238 columns
+- 90 total feature columns (exceeds 60-80 plan target)
+  - rolling: 43 cols (core stat rolling avg/variance/trend + games_of_history)
+  - context: 20 cols (Vegas, weather, opp_def_rank_qb/rb/wr/te)
+  - usage: 4 cols (snap rolling, injury severity, is_starter)
+  - advanced: 23 cols (NGS rolling, PFR rolling, FF opp rolling)
+
+Spot checks:
+- Mahomes 2024 W5: rolling_avg_passing_yards = 240.35 (realistic vs his
+  ~262 2023 avg with slow 2024 start), games_of_history = 24 (correctly
+  counts 2023 regular season + 3 playoff + 4 weeks 2024)
+- Null preservation: 90%+ of non-QBs have NaN NGS passing (correct)
+- NGS population: 17.6% (mostly QB-only fields)
+- PFR population: 45.4% (skill position starters)
+
+Data leakage verification (critical):
+- W1 of first season has NaN opp_def_rank (no prior-week data) — verified
+- Mahomes W1 2024 rolling_avg_passing_yards ≠ 291 (his actual W1) — verified
+- No rolling_avg == current_stat collisions in the full 2023-2024 QB set
+
+Performance:
+- 2024 alone: 16.2s locally on CPU
+- Extrapolation: 8 seasons ≈ 2-3 minutes locally (Colab should match or beat)
+
+Lessons Learned
+---------------
+1. Cross-season rolling is intentional, not leakage. The first review pass
+   flagged groupby('player_id') as a bug. Deeper reading of V5_ROADMAP
+   revealed 2018-2019 are explicitly warm-up seasons to enable week 1 of
+   2020 to have a full lookback window. Documented in rolling.py + test.
+
+2. Review passes catch real bugs. First pass missed position filter (65%
+   row bloat), games_of_history (enabling column for MIN_GAMES_HISTORY
+   downstream), and FEATURE_GROUP_PREFIXES (ablation study enabler).
+   Second pass took a different angle (holistic integration) and caught
+   all three. Always do two review passes on large tasks.
+
+3. Pyright warnings are noise on pandas-heavy code. All 50+ diagnostic
+   warnings during this task were false positives — pandas type inference
+   is imperfect for .rename/.drop_duplicates/.merge. Runtime correctness
+   is what matters; unit tests are the ground truth.
+
+4. Master-table approach beats per-player loops. V4 loaded Parquets per
+   player per week (slow). V5 loads all seasons once, joins into master
+   table, runs vectorized groupby.shift(1).expanding().mean() for rolling
+   features. Faster and easier to reason about — leakage protection is
+   enforced at the shift() level, not spread across the codebase.
+
+5. Feature group prefixes > feature group categories. Ablation study
+   needs to drop columns by group. Hardcoding column lists is brittle
+   (will drift as features are added/removed). Using prefix patterns
+   (rolling_avg_*, ngs_*, pfr_*) makes the grouping self-maintaining.
+
+6. Injury dedup policy matters. A player can have multiple injury report
+   updates in one week (DNP Wednesday → Limited Thursday → Questionable
+   Friday). keep='last' preserves the final game-day status, which is
+   what the model should use. Documented the decision in master_table.py.
+
+7. NGS/PFR column inclusion must be selective. Raw NGS has 29 columns;
+   including all would bloat the feature set without adding signal. We
+   pick 3-4 columns per NGS/PFR source (time_to_throw, CPOE, aggressiveness
+   for passing; separation, YAC above expected, cushion for receiving).
+   Ablation study (Task 3.2b) will validate these choices.
+
+Remaining Risks / Deferred
+--------------------------
+- MIN_GAMES_HISTORY = 3 is defined but not enforced in the feature engineer.
+  games_of_history column now exists so Task 3.2 (training) can filter on it.
+- Rolling loop is Python-level O(players × weeks × stats). Functional but
+  may be slow on large runs. Optimize only if Colab run is too slow.
+- Teammate injury impact feature (medium-tier in V5_QUESTIONS.md) not
+  implemented. Defer pending ablation results.
+- add_opponent_defense_rank has triple nested loop. Works but could be
+  vectorized via merge of precomputed rank table. Defer pending perf data.
+- Production inference skeleton (building feature rows for upcoming games
+  before they happen) is NOT in V5 feature engineer scope. Documented in
+  engineer.py docstring. Will be a separate pipeline for Task 4.x.
+
+Handoff: User runs colab/v5_feature_engineering.ipynb on Colab Pro (high-RAM
+CPU runtime) with data uploaded to Drive. Expected runtime ~30-60 min for
+all 8 seasons. Output goes to Drive /output/features/v5/features_{season}.parquet.
