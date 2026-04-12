@@ -93,6 +93,13 @@ def build_master_table(data_dir, seasons):
                     'practice_status', 'report_primary_injury']
         keep = [c for c in inj_cols if c in injuries.columns]
         injuries = injuries[keep]
+        # Injuries can have multiple rows per (player, week) when the team
+        # files multiple status updates during a week. Keep the last row per
+        # (gsis_id, season, week) — this is typically the final game-day
+        # status, which is the most predictive for fantasy outcomes.
+        injuries = injuries.drop_duplicates(
+            subset=['gsis_id', 'season', 'week'], keep='last'
+        )
         ps = ps.merge(injuries, left_on=['player_id', 'season', 'week'],
                       right_on=['gsis_id', 'season', 'week'],
                       how='left', suffixes=('', '_inj'))
@@ -107,6 +114,10 @@ def build_master_table(data_dir, seasons):
                    'offense_pct', 'st_pct']
         keep = [c for c in sc_cols if c in snap_counts.columns]
         snap_counts = snap_counts[keep]
+        # Dedup guard: prevent row explosion if source has dup (player,season,week)
+        snap_counts = snap_counts.drop_duplicates(
+            subset=['pfr_player_id', 'season', 'week']
+        )
         ps = ps.merge(snap_counts, left_on=['pfr_id', 'season', 'week'],
                       right_on=['pfr_player_id', 'season', 'week'],
                       how='left')
@@ -152,6 +163,10 @@ def build_master_table(data_dir, seasons):
             ngs = ngs[keep]
             rename_map = {c: f'ngs_{stat_type}_{c}' for c in cols if c in ngs.columns}
             ngs = ngs.rename(columns=rename_map)
+            # Dedup guard against duplicate (player, season, week) rows
+            ngs = ngs.drop_duplicates(
+                subset=['player_gsis_id', 'season', 'week']
+            )
             ps = ps.merge(ngs, left_on=['player_id', 'season', 'week'],
                           right_on=['player_gsis_id', 'season', 'week'],
                           how='left')
@@ -177,6 +192,10 @@ def build_master_table(data_dir, seasons):
             pfr = pfr[keep]
             rename_map = {c: f'pfr_{stat_type}_{c}' for c in cols if c in pfr.columns}
             pfr = pfr.rename(columns=rename_map)
+            # Dedup guard against duplicate (player, season, week) rows
+            pfr = pfr.drop_duplicates(
+                subset=['pfr_player_id', 'season', 'week']
+            )
             ps = ps.merge(pfr, left_on=['pfr_id', 'season', 'week'],
                           right_on=['pfr_player_id', 'season', 'week'],
                           how='left')

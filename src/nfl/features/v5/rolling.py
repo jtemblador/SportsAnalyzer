@@ -48,6 +48,12 @@ def add_rolling_features(df, window=ROLLING_WINDOW, stats=None):
         variance = []
         trend = []
 
+        # INTENTIONAL: group by player_id only (not [player_id, season]).
+        # V5_ROADMAP specifies 2018-2019 as warm-up seasons so that Week 1 of
+        # 2020 has a full rolling lookback window from 2019 tail games. This
+        # cross-season history is desired throughout training (2020-2025) so
+        # that Week 1 of each new season uses the prior season's tail, not
+        # empty history. See docs/V5_ROADMAP.md "Season Range: 2018-2025".
         for player_id, group in df.groupby('player_id', sort=False):
             values = group[stat].values
             for i in range(len(values)):

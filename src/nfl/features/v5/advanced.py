@@ -45,7 +45,12 @@ FF_OPP_COLUMNS = [
 
 
 def _rolling_prior_mean(df, col):
-    """Rolling mean using prior weeks only (strict shift-then-expand)."""
+    """Rolling mean using prior weeks only (strict shift-then-expand).
+
+    INTENTIONAL cross-season rolling: groupby('player_id') only so Week 1
+    of a new season uses the prior season's tail (V5_ROADMAP warm-up
+    strategy, "Season Range: 2018-2025").
+    """
     return (
         df.groupby('player_id', sort=False)[col]
           .apply(lambda s: s.shift(1).expanding().mean())

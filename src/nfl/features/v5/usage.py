@@ -21,7 +21,10 @@ def add_usage_features(df):
     """
     df = df.sort_values(['player_id', 'season', 'week']).reset_index(drop=True)
 
-    # 1. Rolling snap share (prior weeks only)
+    # 1. Rolling snap share (prior weeks only).
+    # INTENTIONAL cross-season rolling: groupby('player_id') only so Week 1
+    # of a new season carries snap-share history from the prior season's
+    # tail games (V5_ROADMAP "Season Range: 2018-2025").
     if 'offense_pct' in df.columns:
         df['rolling_offense_pct'] = (
             df.groupby('player_id', sort=False)['offense_pct']

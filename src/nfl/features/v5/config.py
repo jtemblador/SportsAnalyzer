@@ -41,6 +41,8 @@ CORE_STATS_FOR_ROLLING = [
     'passing_yards', 'passing_tds', 'passing_interceptions',
     'rushing_yards', 'rushing_tds', 'carries',
     'receiving_yards', 'receiving_tds', 'receptions', 'targets',
+    # Kicker stats — required so kicker predictions have rolling features
+    'fg_made', 'fg_att', 'pat_made',
 ]
 
 # Fantasy PPR scoring formula — used to derive fantasy points from predicted stats

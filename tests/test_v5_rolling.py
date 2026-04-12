@@ -86,3 +86,33 @@ def test_no_data_leakage_across_players():
     b_w2 = df[(df['player_id'] == 'B') & (df['week'] == 2)].iloc[0]
     # Player B week 2 rolling avg should only use B's week 1 data (30), not A's
     assert b_w2['rolling_avg_fantasy_points_ppr'] == pytest.approx(30.0, abs=0.01)
+
+
+def test_cross_season_rolling_is_intentional():
+    """Week 1 of a new season MUST carry history from the prior season's
+    tail games. This is by design — V5_ROADMAP "Season Range: 2018-2025"
+    specifies 2018-2019 as warm-up so Week 1 of 2020 has a full lookback.
+    The same cross-season behavior applies throughout 2020-2025 training.
+    """
+    df_input = pd.DataFrame({
+        'player_id': ['P'] * 4,
+        'player_name': ['Test'] * 4,
+        'position': ['QB'] * 4,
+        'season': [2023, 2023, 2024, 2024],
+        'week': [17, 18, 1, 2],
+        'passing_yards': [250, 300, 200, 220],
+        'fantasy_points_ppr': [20.0, 25.0, 15.0, 18.0],
+        'carries': [0] * 4, 'targets': [0] * 4, 'receptions': [0] * 4,
+        'rushing_yards': [0] * 4, 'rushing_tds': [0] * 4,
+        'receiving_yards': [0] * 4, 'receiving_tds': [0] * 4,
+        'passing_tds': [0] * 4, 'passing_interceptions': [0] * 4,
+    })
+    df = add_rolling_features(df_input)
+    # Week 1 of 2024 MUST carry history from 2023 (not be NaN).
+    w1_2024 = df[(df['season'] == 2024) & (df['week'] == 1)].iloc[0]
+    assert not pd.isna(w1_2024['rolling_avg_fantasy_points_ppr']), (
+        "Week 1 of a new season must have rolling history from prior season"
+    )
+    # Expect decay-weighted avg of [20.0, 25.0] (chronological), reversed
+    # to [25.0, 20.0] with weights [1.0, 0.85]: (25 + 17)/1.85 ≈ 22.7
+    assert w1_2024['rolling_avg_fantasy_points_ppr'] == pytest.approx(22.7, abs=0.1)
