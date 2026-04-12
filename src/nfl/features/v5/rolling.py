@@ -43,6 +43,11 @@ def add_rolling_features(df, window=ROLLING_WINDOW, stats=None):
 
     df = df.sort_values(['player_id', 'season', 'week']).reset_index(drop=True)
 
+    # Add games_of_history column — counts prior games per player across all seasons.
+    # Downstream code can use this with MIN_GAMES_HISTORY (config.py) to filter
+    # insufficient-history rows or flag rookies for special handling.
+    df['games_of_history'] = df.groupby('player_id', sort=False).cumcount()
+
     for stat in stats:
         rolling_avg = []
         variance = []

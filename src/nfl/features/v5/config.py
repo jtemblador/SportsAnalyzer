@@ -56,3 +56,65 @@ FANTASY_PPR_WEIGHTS = {
     'receiving_yards': 0.1,
     'receiving_tds': 6.0,
 }
+
+
+# Column prefixes/exact names that belong to each feature group.
+# Used by Task 3.2b ablation study to drop one group at a time.
+# A feature column belongs to group G if it starts with any prefix in
+# FEATURE_GROUP_PREFIXES[G]['prefixes'] OR is in the 'exact' list.
+FEATURE_GROUP_PREFIXES = {
+    'rolling': {
+        'prefixes': ['rolling_avg_', 'variance_', 'trend_'],
+        'exact': ['games_of_history'],
+    },
+    'context': {
+        'prefixes': ['opp_def_rank_'],
+        'exact': [
+            'game_script_index', 'total_game_points',
+            'is_dome', 'is_high_wind', 'is_cold', 'is_home',
+            'team_implied_total', 'opponent_implied_total',
+            'spread_line', 'total_line', 'team_rest', 'opponent_rest',
+            'temp', 'wind', 'roof', 'div_game',
+        ],
+    },
+    'usage': {
+        'prefixes': ['rolling_offense_pct', 'prior_week_offense_pct'],
+        'exact': ['injury_severity', 'is_starter'],
+    },
+    'advanced': {
+        'prefixes': ['rolling_ngs_', 'rolling_pfr_', 'rolling_total_fantasy_points_',
+                     'rolling_pass_fantasy_points_', 'rolling_rec_fantasy_points_',
+                     'rolling_rush_fantasy_points_'],
+        'exact': [],
+    },
+}
+
+
+def get_feature_columns_by_group(df_columns, group):
+    """
+    Given a list of column names and a feature group name, return the subset
+    of columns belonging to that group.
+
+    Args:
+        df_columns: list of column names from a feature DataFrame
+        group: one of 'rolling', 'context', 'usage', 'advanced'
+
+    Returns:
+        List of column names that belong to the specified group.
+    """
+    if group not in FEATURE_GROUP_PREFIXES:
+        raise ValueError(
+            f"Unknown group '{group}'. Must be one of {list(FEATURE_GROUP_PREFIXES)}"
+        )
+
+    spec = FEATURE_GROUP_PREFIXES[group]
+    prefixes = spec['prefixes']
+    exacts = set(spec['exact'])
+
+    matches = []
+    for col in df_columns:
+        if col in exacts:
+            matches.append(col)
+        elif any(col.startswith(p) for p in prefixes):
+            matches.append(col)
+    return matches

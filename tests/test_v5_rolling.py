@@ -116,3 +116,28 @@ def test_cross_season_rolling_is_intentional():
     # Expect decay-weighted avg of [20.0, 25.0] (chronological), reversed
     # to [25.0, 20.0] with weights [1.0, 0.85]: (25 + 17)/1.85 ≈ 22.7
     assert w1_2024['rolling_avg_fantasy_points_ppr'] == pytest.approx(22.7, abs=0.1)
+
+
+def test_games_of_history_counts_prior_games():
+    """games_of_history = number of games BEFORE current (so week 1 = 0, week 2 = 1)."""
+    df = pd.DataFrame({
+        'player_id': ['A', 'A', 'A', 'B'],
+        'player_name': ['A', 'A', 'A', 'B'],
+        'position': ['QB']*4, 'season': [2024]*4, 'week': [1, 2, 3, 1],
+        'fantasy_points_ppr': [10.0, 20.0, 15.0, 25.0],
+        'passing_yards': [200, 250, 220, 300],
+        'carries': [0]*4, 'targets': [0]*4, 'receptions': [0]*4,
+        'rushing_yards': [0]*4, 'rushing_tds': [0]*4,
+        'receiving_yards': [0]*4, 'receiving_tds': [0]*4,
+        'passing_tds': [1, 2, 1, 2], 'passing_interceptions': [0]*4,
+    })
+    out = add_rolling_features(df)
+    # Player A week 1 -> 0 prior games
+    a_w1 = out[(out['player_id'] == 'A') & (out['week'] == 1)].iloc[0]
+    assert a_w1['games_of_history'] == 0
+    # Player A week 3 -> 2 prior games
+    a_w3 = out[(out['player_id'] == 'A') & (out['week'] == 3)].iloc[0]
+    assert a_w3['games_of_history'] == 2
+    # Player B week 1 -> 0 prior games (independent count per player)
+    b_w1 = out[(out['player_id'] == 'B') & (out['week'] == 1)].iloc[0]
+    assert b_w1['games_of_history'] == 0

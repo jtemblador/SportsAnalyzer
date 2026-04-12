@@ -40,6 +40,12 @@ def build_master_table(data_dir, seasons):
     # Filter null player_ids (garbage rows)
     ps = ps[ps['player_id'].notna()].copy()
 
+    # Filter to predictable positions only — drops ~65% of rows (LB/CB/DL/OL/etc.)
+    # These positions aren't in STATS_TO_PREDICT and can't be predicted.
+    # Local constant avoids circular imports with config.py.
+    PREDICTABLE_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K']
+    ps = ps[ps['position'].isin(PREDICTABLE_POSITIONS)].copy()
+
     # 2. LEFT JOIN players to get PFR ID mapping
     players_path = data_dir / 'players' / 'players.parquet'
     if players_path.exists():

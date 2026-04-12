@@ -30,7 +30,19 @@ from src.nfl.features.v5.advanced import add_advanced_features
 
 def build_features(data_dir, seasons, output_dir=None, verbose=True):
     """
-    Build V5 features for all players across given seasons.
+    Build V5 features for all players across given seasons — TRAINING DATA.
+
+    This function produces historical feature rows (one per player per
+    completed game). It does NOT produce feature rows for upcoming/future
+    games — that is the job of a separate inference pipeline (future task).
+
+    The output is intended for model training. For week-ahead predictions
+    during the live 2026 season, a separate inference builder will:
+      1. Take the upcoming schedule (Vegas lines, weather, opponent)
+      2. Look up each player's most recent rolling features from this
+         training output
+      3. Construct an inference row per (player, upcoming game)
+      4. Feed to trained V5 model
 
     Args:
         data_dir: Path to data/nfl/ (contains subdirs for each dataset)
@@ -73,6 +85,13 @@ def build_features(data_dir, seasons, output_dir=None, verbose=True):
         print(f"Final feature table: {len(df):,} rows, {len(df.columns)} columns")
 
     if output_dir:
+        # Schema consistency note: all per-season outputs below come from the
+        # same in-memory DataFrame, so their columns are guaranteed identical
+        # within a single build_features() call. Cross-call consistency (e.g.,
+        # running once for 2018-2020 and again for 2021-2025 then concatenating)
+        # is NOT guaranteed — different season ranges may have different data
+        # availability. If that use case arises, add a defensive reindex here
+        # against a canonical column list.
         out = Path(output_dir) / VERSION
         out.mkdir(parents=True, exist_ok=True)
         for season, season_df in df.groupby('season'):
