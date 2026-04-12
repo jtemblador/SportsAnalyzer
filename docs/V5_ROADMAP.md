@@ -10,7 +10,27 @@
 - `app.py` (Streamlit dashboard) is broken — will be rebuilt in Task 4.1
 - Project restructured: active code in `src/nfl/` (data + db), V1-V4 ML code in `legacy/v1-v4/`
 - Full V4 codebase tagged as `v4-final` for reproducibility
-- Full dataset audit — see `docs/AVAILABLE_DATASETS.md`
+- Full dataset audit — see `docs/V5_AVAILABLE_DATASETS.md` and `docs/V5_DATA_CATALOG.md`
+- **Database inventory (16 tables, 864K+ rows):**
+
+| Table | Rows | V5 Feature Use |
+|-------|------|----------------|
+| weekly_stats | 147,050 | Rolling averages, variance, trends (proven V2/V4) |
+| games | 2,227 | Vegas lines, spread, implied total, weather, rest, home/away (proven V4) |
+| injuries | 45,337 | Player own status, teammate injury impact |
+| snap_counts | 205,354 | Offense snap %, snap trend (direct opportunity proxy) |
+| depth_charts | 258,942 | Starter/backup flag (2018-2024 only) |
+| ff_opportunity | 47,282 | Expected fantasy points, actual vs expected differential |
+| team_stats | 4,454 | Opponent defense rank against position (proven V4) |
+| ngs_passing | 4,785 | Time to throw, CPOE, aggressiveness (~32 QBs/week) |
+| ngs_rushing | 4,885 | Rush yards over expected, efficiency (~34 players/week) |
+| ngs_receiving | 11,708 | Separation, YAC above expected (~66 players/week) |
+| pfr_pass_advstats | 5,424 | Pressure rate, blitz rate (~36 QBs/week) |
+| pfr_rush_advstats | 18,461 | Yards after contact, broken tackles (~130 players/week) |
+| pfr_rec_advstats | 35,724 | Drop rate, passer rating when targeted (~250 players/week) |
+| players | 6,543 | GSIS↔PFR ID mapping table |
+| predictions | 65,921 | V1-V4 predictions with actuals backfilled |
+| model_versions | 4 | V1-V4 metadata (MAE, description) |
 
 ## Goal
 1. Expand data collection to all useful nflreadpy datasets (Tier 1 + Tier 2)
@@ -302,15 +322,62 @@ Two ID formats exist across our datasets:
 ---
 
 ## Phase 3: V5 Model — Feature Engineering, Training, and Validation
-**Goal:** Use all 13 data sources + PostgreSQL to build V5 model. Target MAE < 4.0. See `docs/V5_QUESTIONS.md` for full architectural decisions.
+**Goal:** Use all 13 data sources to build V5 model. Target MAE < 4.0. See `docs/V5_QUESTIONS.md` for full architectural decisions.
 
 **Key V5 decisions:**
 - Predict individual stats per position (not just fantasy_points_ppr) — dashboard shows per-stat over/under
 - 2 model types: StatPredictor (raw prediction) + POB (over/under probability). EVOB dropped.
 - 4-algorithm ensemble: XGBoost, LightGBM, CatBoost, RandomForest
 - Pre-game features only (no data leakage)
-- Bulk SQL pipeline, not per-player loops
+- **Scripts read from Parquet files (not PostgreSQL)** so they run on Google Colab
 - Walk-forward validation, then ablation study to prove which features helped
+
+### Google Colab Workflow for Heavy Compute
+
+All compute-intensive tasks (feature engineering, training, ablation) run on Google Colab Pro to speed up development. Local machine is only used for code editing, PostgreSQL queries, and the dashboard.
+
+**Drive structure** (`My Drive/SportsAnalyzer/`):
+```
+SportsAnalyzer/
+├── data/nfl/         ← 13 dataset folders (~30MB, uploaded once)
+│   ├── player_stats/, schedules/, injuries/, snap_counts/
+│   ├── nextgen_stats/, ff_opportunity/, pfr_advstats/
+│   ├── team_stats/, depth_charts/, players/
+├── scripts/          ← Python scripts (uploaded per handoff)
+│   ├── v5_engineer.py
+│   ├── v5_train.py
+│   └── v5_ablation.py
+└── output/           ← Script outputs (downloaded after run)
+    ├── features/     ← Per-season feature Parquet files
+    ├── models/       ← Trained .joblib files
+    └── predictions/  ← Final V5 predictions
+```
+
+**Handoff workflow at each compute-heavy step:**
+1. Claude writes the script locally (reads from Parquet paths, not PostgreSQL)
+2. User uploads the script to Drive `scripts/` folder
+3. User opens Colab notebook in VS Code, connects to high-RAM runtime
+4. User runs notebook cells: mount Drive → `%run scripts/<script>.py`
+5. Script writes output to Drive `output/` folder
+6. User downloads output to local machine (or just stays in Drive)
+7. User confirms "done" in chat — Claude resumes with next step
+
+**One-time setup (before first handoff):**
+- [x] Upload `data/nfl/` folder to Drive (excluding `features/`, `models/`, `predictions/` — we're regenerating those)
+- [x] Create `scripts/` and `output/` folders in Drive
+- [x] Test Colab connection from VS Code, verify Drive mount works (`colab/colab_test.ipynb` passed)
+
+### Task 3.0 — Colab notebooks (create alongside each Phase 3 task)
+
+Notebooks live in `colab/` locally (for version control) and get copied to Drive before each run.
+
+- [x] `colab/colab_test.ipynb` — verify Drive mount + data access + ML libraries
+- [ ] `colab/v5_feature_engineering.ipynb` — runs feature engineering script (paired with Task 3.1)
+- [ ] `colab/v5_training.ipynb` — runs training script (paired with Task 3.2)
+- [ ] `colab/v5_ablation.ipynb` — runs ablation study script (paired with Task 3.2b)
+- [ ] `colab/v5_final_retrain.ipynb` — runs final retrain + prediction generation (paired with Task 3.2c)
+
+Each notebook follows the same pattern: mount Drive → install any missing libs → `%run scripts/<script>.py` → save output to Drive. The `.py` scripts contain all the logic; notebooks are thin wrappers.
 
 ### Task 3.1 — V5 feature engineering (**Heavy** — largest task in Phase 3)
 - [ ] Create `src/nfl/features/v5_engineer.py` with batch SQL pipeline
@@ -334,6 +401,7 @@ Two ID formats exist across our datasets:
 - [ ] Pre-game features only: rolling stats, Vegas lines, injury reports, snap trends — NO current-game data
 - [ ] Target: 60-80 features per position (up from V4's 50)
 - [ ] **Deliverable:** `v5_engineer.py` with `build_features(season, week)` → DataFrame for all players
+- **>>> HANDOFF POINT #1:** After code is written, user runs `v5_engineer.py` to generate feature files for all seasons (estimated 4-5 hours). Claude resumes after features are on disk.
 
 ### Task 3.1b — Feature validation (**Quick** — spot-check pass)
 - [ ] Verify no data leakage: features for week N only use data from weeks < N
@@ -356,6 +424,7 @@ Two ID formats exist across our datasets:
 - [ ] Compute per-stat and per-position MAE, compare against V4
 - [ ] Generate feature importance rankings per position
 - [ ] **Deliverable:** Trained V5 models in `data/nfl/models/v5/`, MAE results documented
+- **>>> HANDOFF POINT #2:** After training script is written, user runs `v5_train.py` to train all models (estimated 1-4 hours depending on machine). Claude resumes to analyze results.
 
 ### Task 3.2b — Ablation study (**Heavy** — retrains model ~8-10 times)
 - [ ] Remove one feature group at a time, retrain, measure MAE change:
@@ -369,6 +438,7 @@ Two ID formats exist across our datasets:
 - [ ] Any feature group that improves MAE by < 0.05 when included → drop it
 - [ ] Document results: "snap counts improved RB MAE by X, NGS had no measurable impact"
 - [ ] **Deliverable:** Validated feature set — only features that proved their value remain
+- **>>> HANDOFF POINT #3:** User runs ablation script (retrains ~8-10 times, estimated 8-30 hours total). Claude resumes to analyze results and decide which features to keep.
 
 ### Task 3.2c — Final V5 retrain (**Medium** — one training run with finalized features)
 - [ ] Retrain V5 with ablation-validated feature set (noise features removed)
@@ -378,6 +448,7 @@ Two ID formats exist across our datasets:
 - [ ] Compare V5 vs V4 MAE in database: `SELECT version, AVG(error) ... GROUP BY version`
 - [ ] **Deliverable:** Final V5 model, predictions loaded, cross-version accuracy verified
 - [ ] **Target MAE:** < 4.0 overall (TE < 3.5, RB < 4.5, WR < 4.5, QB < 6.5)
+- **>>> HANDOFF POINT #4:** User runs final training + prediction generation (estimated 1-2 hours). Claude resumes to load results into DB and verify.
 
 ### Task 3.3 — Prediction accuracy dashboard (**Medium** — visualization work)
 - [ ] New Streamlit page or tab: model accuracy comparison
