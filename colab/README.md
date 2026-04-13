@@ -12,7 +12,7 @@ Feature engineering (~4-5 hours) and model training (~1-4 hours) are too slow on
 |----------|---------|--------|
 | `colab_test.ipynb` | Verify Colab connection, Drive mount, data access, ML libraries | Ready |
 | `v5_feature_engineering.ipynb` | Run V5 player + DST feature engineering on all seasons | Ready (HANDOFF #1.5) |
-| `v5_training.ipynb` | Train V5 models with walk-forward validation | Pending Task 3.2 |
+| `v5_training.ipynb` | Train V5 models (54 ensembles, 174 .joblib) with walk-forward eval | Ready (HANDOFF #2) |
 | `v5_ablation.ipynb` | Feature ablation study | Pending Task 3.2b |
 | `v5_final_retrain.ipynb` | Final V5 training with validated features + predictions | Pending Task 3.2c |
 
@@ -29,7 +29,7 @@ Each notebook follows the same pattern:
 ```
 My Drive/SportsAnalyzer/
 ├── data/nfl/                 ← 13 dataset folders (uploaded once from local data/nfl/)
-├── src/nfl/features/v5/      ← V5 package (re-upload after code changes)
+├── src/nfl/features/v5/      ← V5 features package
 │   ├── __init__.py
 │   ├── config.py
 │   ├── master_table.py
@@ -38,11 +38,18 @@ My Drive/SportsAnalyzer/
 │   ├── usage.py
 │   ├── advanced.py
 │   ├── dst.py        ← Task 3.1.5
-│   ├── utils.py      ← shared rolling helpers (Task 3.1.5 refactor)
+│   ├── utils.py      ← shared rolling helpers
 │   └── engineer.py
+├── src/nfl/training/v5/      ← V5 training package (Task 3.2)
+│   ├── __init__.py
+│   ├── config.py     ← POSITION_ALGORITHMS, COUNT_STATS, hyperparams
+│   ├── data.py       ← per-position loader, history filter, POB target
+│   ├── models.py     ← StatPredictor + POBModel ensembles
+│   ├── walkforward.py
+│   └── train.py
 └── output/
-    ├── features/v5/  ← notebook writes 16 parquets (8 player + 8 DST)
-    ├── models/       ← Trained .joblib files (Task 3.2)
+    ├── features/v5/  ← 16 parquets from HANDOFF #1.5
+    ├── models/v5/    ← 174 .joblib + 54 .json + _mae_summary.csv (HANDOFF #2)
     └── predictions/  ← V5 predictions (Task 3.2c)
 ```
 

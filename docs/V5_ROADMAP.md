@@ -458,64 +458,239 @@ where points_allowed_bonus:
   - Refactored both `rolling.py` and `dst.py` to use `groupby(...).transform(...)` instead of the prior list-append + bulk-assign pattern. Math is byte-for-byte identical (all 68 v5 tests pass without value drift); transform makes the position-safety contract structural rather than implicit, eliminating a latent silent-corruption hazard if the input DataFrame ordering ever changed.
   - Fixed `add_dst_opponent_offense` brittleness — `DataFrame.get(col, 0).fillna(0)` would have crashed if any optional column ever went missing in a future nflverse release. Replaced with a defensive `_col` helper returning a zero-filled Series. Regression test now pins arithmetic values.
   - Strengthened rolling leakage test with explicit decay-weighted-average value pin (catches off-by-one in window slicing).
-- [ ] **Deliverable:** 8 per-season DST feature Parquets (~576 rows × 8 seasons ≈ 4,500 rows total) + 8 re-generated player feature Parquets ready for training.
+- [x] **Deliverable:** 8 per-season DST feature Parquets (~576 rows × 8 seasons ≈ 4,500 rows total) + 8 re-generated player feature Parquets ready for training.
 - **Local re-run is fast (~3 min for both pipelines, 8 seasons).** Colab handoff is optional but recommended to keep the production-output path consistent with Task 3.1.
 - **>>> HANDOFF POINT #1.5:** Re-run `colab/v5_feature_engineering.ipynb` (or local equivalent) — `build_features` now produces both `features_{season}.parquet` AND `features_dst_{season}.parquet` per season. Stale player parquets from Handoff #1 were deleted (rolling math is identical post-refactor, but re-running keeps the production pipeline in sync with the code). Estimated 30-60 min on Colab Pro for all 8 seasons. Output: 16 Parquets total (8 player + 8 DST) in `data/nfl/features/v5/`.
 
-### Task 3.2 — V5 model training (**Heavy** — compute-intensive, ~20-30 min per full run)
-- [ ] Create `src/nfl/training/v5_train.py`
-- [ ] Train per-position models: StatPredictor + POB for each stat
-  - QB: passing_yards, passing_tds, passing_interceptions, rushing_yards, rushing_tds (5 stats × 2 types = 10 models)
-  - RB: rushing_yards, rushing_tds, receptions, receiving_yards, receiving_tds (5 × 2 = 10)
-  - WR: receptions, receiving_yards, receiving_tds, targets (4 × 2 = 8)
-  - TE: receptions, receiving_yards, receiving_tds, targets (4 × 2 = 8)
-  - K: fg_made, fg_att, pat_made (3 × 2 = 6)
-  - **DST: sacks, interceptions, fumble_recoveries, defensive_tds, safeties, points_allowed (6 × 2 = 12)**
-  - **Total: ~54 models** (was 42, +12 for DST)
-- [ ] Position-specific hyperparameters (from V4): QB depth=9, RB/WR depth=7, TE depth=6, K depth=3
-- [ ] Expanding-window walk-forward validation: train on prior data, predict each week for 2021-2024
-- [ ] Compute per-stat and per-position MAE, compare against V4
-- [ ] Generate feature importance rankings per position
-- [ ] Create `colab/v5_training.ipynb` with required cells: mount Drive, paths, **high-RAM/CPU check (`psutil.virtual_memory().total >= 20GB` assertion)**, install catboost/xgboost/lightgbm if needed, `%run v5_train.py`, verify output models, print MAE summary
-- [ ] **Deliverable:** Trained V5 models in `data/nfl/models/v5/`, MAE results documented
-- **>>> HANDOFF POINT #2:** User runs `colab/v5_training.ipynb` on Colab Pro (high-RAM CPU). Estimated 1-4 hours. Claude resumes to analyze results.
+### Task 3.2 — V5 model training (**Heavy** — compute-intensive, Colab handoff)
 
-### Task 3.2b — Ablation study (**Heavy** — retrains model ~8-10 times)
-- [ ] Remove one feature group at a time, retrain, measure MAE change:
-  - Remove snap count features → measure impact
-  - Remove injury features → measure impact
-  - Remove NGS features → measure impact
-  - Remove PFR features → measure impact
-  - Remove FF opportunity features → measure impact
-  - Remove weather features → measure impact
-  - Remove depth chart features → measure impact
-- [ ] Any feature group that improves MAE by < 0.05 when included → drop it
-- [ ] Document results: "snap counts improved RB MAE by X, NGS had no measurable impact"
-- [ ] Create `colab/v5_ablation.ipynb` with required cells: mount Drive, paths, **high-RAM/CPU check**, install ML libs, `%run v5_ablation.py`, summarize MAE deltas per feature group
-- [ ] **Deliverable:** Validated feature set — only features that proved their value remain
-- **>>> HANDOFF POINT #3:** User runs `colab/v5_ablation.ipynb` (retrains ~8-10 times, estimated 8-30 hours total — consider Colab Pro+ for background execution). Claude resumes to analyze results.
+**Goal:** Train and validate the V5 stat-prediction models. Two model types per (position, stat) — `StatPredictor` (regression on raw stat) + `POB` (binary classifier: P(stat > player's rolling baseline)). Each is a 4-algorithm ensemble (XGBoost, LightGBM, CatBoost, RandomForest). Total: 27 stat-keys × 2 types × 4 algos = **216 trained model files**, organized as 54 ensembles. Generates per-position/per-stat MAE on a walk-forward holdout (2021-2024) for V4 comparison.
 
-### Task 3.2c — Final V5 retrain (**Medium** — one training run with finalized features)
-- [ ] Retrain V5 with ablation-validated feature set (noise features removed)
-- [ ] Train production model on all 2020-2025 data
-- [ ] Generate predictions for 2025 season (for comparison with V1-V4)
-- [ ] Load V5 predictions into `predictions` table (reuse `load_predictions.py`)
-- [ ] Compare V5 vs V4 MAE in database: `SELECT version, AVG(error) ... GROUP BY version`
-- [ ] Create `colab/v5_final_retrain.ipynb` with required cells: mount Drive, paths, **high-RAM/CPU check**, install ML libs, `%run v5_final_retrain.py`, save models + predictions to Drive
-- [ ] **Deliverable:** Final V5 model, predictions loaded, cross-version accuracy verified
-- [ ] **Target MAE:** < 4.0 overall (TE < 3.5, RB < 4.5, WR < 4.5, QB < 6.5)
-- **>>> HANDOFF POINT #4:** User runs `colab/v5_final_retrain.ipynb` (estimated 1-2 hours). Claude resumes to load results into DB and verify.
+**Models trained per (position × stat × type) — 27 stat-keys, 54 ensembles:**
 
-### Task 3.3 — Prediction accuracy dashboard (**Medium** — visualization work)
-- [ ] New Streamlit page or tab: model accuracy comparison
-- [ ] Powered by SQL queries on predictions table (already has actuals + errors)
-- [ ] Charts:
-  - MAE by version (bar chart: V1 → V5)
-  - MAE by position by version (grouped bar chart)
-  - Predicted vs actual scatter plot (by position, filterable by version)
-  - Per-week MAE trend line (does accuracy degrade later in season?)
-  - Feature importance bar chart (from ablation results)
-- [ ] **Deliverable:** Interactive accuracy dashboard comparing V1-V5
+| Position | Stats predicted | Stat-keys | × 2 types | Notes |
+|----------|-----------------|-----------|-----------|-------|
+| QB | passing_yards, passing_tds, passing_interceptions, rushing_yards, rushing_tds | 5 | 10 | depth=9 (V4-proven) |
+| RB | rushing_yards, rushing_tds, receptions, receiving_yards, receiving_tds | 5 | 10 | depth=7 |
+| WR | receptions, receiving_yards, receiving_tds, targets | 4 | 8 | depth=7 |
+| TE | receptions, receiving_yards, receiving_tds, targets | 4 | 8 | depth=6 |
+| K | fg_made, fg_att, pat_made | 3 | 6 | depth=3 (sparse outcome) |
+| **DST** | sacks, interceptions, fumble_recoveries, defensive_tds, safeties, points_allowed | 6 | 12 | **depth=5, iter=200** (smaller dataset) |
+| **Total** | | **27** | **54** | × 4 algos = 216 model files |
+
+**Key architecture decisions (lock these in before build):**
+
+1. **Train/eval/production splits.**
+   - Warm-up data: 2018-2019 (rolling history only — never trained on directly; already filtered out by `games_of_history >= MIN_GAMES_HISTORY=3` in features)
+   - Eval split: walk-forward on **2021-2024** (4 seasons of holdout). For each evaluation week W of season S: train on all rows with `(season, week) < (S, W)`, predict week W. Rolling expanding window, NOT a fixed 6-season chunk. Justification: matches how the model is actually used in production (predict next week given everything before).
+   - **2020 is intentionally excluded from eval** — COVID season, weird game scripts, but kept in training data for everything afterward.
+   - Production model (Task 3.2c): retrained on all 2020-2025 data after ablation.
+
+2. **POB baseline definition.** POB target = `1 if actual_value > rolling_avg_<stat> else 0`. Baseline column already exists in features (e.g., `rolling_avg_passing_yards`). Rows where `rolling_avg_<stat>` is NaN (insufficient history) are dropped from POB training AND POB evaluation — model only learns from players with history. POB output column in predictions table: `probability_over` (FLOAT 0-1).
+
+3. **Insufficient-history filter.** Apply `games_of_history >= MIN_GAMES_HISTORY=3` (config.py constant). Drop rows below threshold from BOTH training and evaluation. Side effect: rookies' first 3 games never appear in metrics. Acceptable for portfolio (matches how betting models work — wait for sample size).
+
+4. **Model file naming.** Convention: `data/nfl/models/v5/{POS}_{stat}_{type}_{algo}.joblib`
+   - Example: `QB_passing_yards_stat_xgboost.joblib`, `QB_passing_yards_pob_catboost.joblib`
+   - Plus per-ensemble metadata: `{POS}_{stat}_{type}_meta.json` (feature columns, training rows, MAE, weights for ensemble averaging if non-uniform)
+   - DST naming: `DST_sacks_stat_xgboost.joblib` etc. (uses 'DST' as the position token).
+
+5. **Ensemble averaging.** Simple mean across 4 algorithms for V5 baseline (V4-proven). Feature engineering already gives each algo NULL-safe inputs (CatBoost, XGBoost ≥1.5, LightGBM all native; RandomForest gets median-imputed via sklearn pipeline at training time).
+
+6. **DST hyperparameters reduced from V4 player defaults.** With only ~4,254 rows (vs player ~52K), default depth=7 risks overfitting. Use depth=5, iter=200 for DST. Validate with cross-position MAE comparison after first run — if DST overfits (train MAE << eval MAE), reduce further.
+
+7. **Predictions table integration (carries forward to 3.2c).** DST predictions reuse the existing `predictions` table schema with `player_id = team_abbr` (e.g., 'KC'), `player_name = team full name`, `position = 'DST'`, `team = team_abbr`, `opponent = opponent_team`. Permissive schema accommodates both per-player and per-team rows. No new table.
+
+**Implementation plan:**
+- [ ] Create `src/nfl/training/v5/` package (mirror features/v5/ structure):
+  - `config.py` — POSITION_HYPERPARAMS dict (QB depth=9, RB/WR=7, TE=6, K=3, DST=5), ALGORITHMS list, ENSEMBLE_WEIGHTS (default uniform), STAT_KEYS_BY_POSITION (mirrors STATS_TO_PREDICT)
+  - `data.py` — `load_features(positions, seasons)` returns concatenated player+DST DataFrame with feature/target/key columns, `apply_history_filter(df)` enforces MIN_GAMES_HISTORY, `compute_pob_target(df, stat)` adds POB binary label
+  - `models.py` — `StatPredictor(position, stat)` and `POBModel(position, stat)` classes wrapping the 4-algo ensemble. Both expose `.fit(X, y)`, `.predict(X)`, `.feature_importances()`. Reuse V4 base model patterns from `legacy/v1-v4/` where sensible.
+  - `walkforward.py` — `walk_forward_eval(model_class, features_df, eval_seasons)` — yields (train_idx, predict_idx) per (season, week), accumulates predictions + actuals + errors
+  - `train.py` — orchestrator entry point. For each (position, stat, type): instantiate model, run walk-forward, save artifacts, append to MAE summary table
+  - `__init__.py` — exports `train_all`, `walk_forward_eval`
+- [ ] Tests in `tests/test_v5_training.py`:
+  - Hyperparams config sane (depth/iter ranges per position)
+  - `apply_history_filter` drops rows where games_of_history < 3
+  - `compute_pob_target` drops NaN-baseline rows + correctly labels actual > baseline
+  - Walk-forward yields strictly-prior train indices for every predict week (synthetic 2-season fixture)
+  - Ensemble `.predict` returns mean of 4 algos within tolerance
+  - Smoke: train 1 model (e.g., TE/receptions/StatPredictor) on real 2021-2022 data in <30s, MAE within plausible bounds (1.5-4.0)
+- [ ] Create `colab/v5_training.ipynb` with required cells:
+  - Step 1: Mount Drive
+  - Step 2: Verify code + features uploaded (16 parquets present in features/v5/)
+  - Step 3: **High-RAM/CPU check** — `assert psutil.virtual_memory().total >= 20e9`
+  - Step 4: Install ML libs (`!pip install catboost xgboost lightgbm` if not present)
+  - Step 5: Resumable check — list which (position, stat, type) ensembles already have output `.joblib` + `_meta.json` files; build `missing` list
+  - Step 6: Run training loop over `missing` — per ensemble: load features → walk-forward eval → save 4 algo files + meta JSON → print per-stat MAE
+  - Step 7: Verify all 54 ensembles present (216 .joblib + 54 .json)
+  - Step 8: Print MAE summary table (per position, per stat, vs V4 baseline)
+- [ ] **Deliverable:** Trained V5 models (216 .joblib files + 54 metadata JSON) in `data/nfl/models/v5/`, MAE summary saved to `data/nfl/models/v5/_mae_summary.csv` (columns: position, stat, model_type, mae_v5, mae_v4, delta, n_predictions)
+- [ ] **Estimated runtime:** 1-4 hours on Colab Pro high-RAM CPU. DST is fast (~2 min for all 12 ensembles); player models dominate (QB/RB/WR/TE/K combined ~1-3.5 hours).
+- **>>> HANDOFF POINT #2:** User runs `colab/v5_training.ipynb` on Colab Pro. Claude resumes to analyze MAE results before triggering Task 3.2b.
+
+**Risks / pre-flight checks:**
+- DST model count is small (~4,254 rows for training; walk-forward may leave only ~500-1000 rows for early-eval seasons). Possible solution: pool DST with a longer history window OR reduce eval to 2023-2024 only. Decide after first MAE pass.
+- POB labels are imbalanced if rolling_avg is biased — verify `compute_pob_target` produces ~50/50 split per (position, stat). If skewed (e.g., 70/30), POB models will underperform. Stratified sampling may be needed.
+- V4 MAE baseline numbers (5.14/4.66/4.66/4.26) come from a different feature set + train range. For honest comparison, also retrain V4 on the V5 train/eval split — OR accept that V5-vs-V4 is approximate. Recommendation: report V5 numbers standalone with V4 numbers cited as reference (not apples-to-apples).
+- Colab disconnects mid-training: notebook must be resumable per-ensemble (skip if .joblib + meta JSON exist). Built into Step 5.
+- Feature column drift: training must read feature columns from each Parquet's actual schema, not a hardcoded list. Use `get_feature_columns_by_group(df.columns, group)` for player; for DST, build a similar helper or compile the DST feature list dynamically.
+
+### Task 3.2b — Ablation study (**Heavy** — retrains StatPredictor model N times)
+
+**Goal:** Validate which feature groups carry signal. Drop noise features so the production model (Task 3.2c) is leaner and faster. Produces a portfolio talking point ("I systematically validated which data sources contributed signal — snap counts improved RB MAE by X, NGS contributed Y, FF opportunity Z").
+
+**Key architecture decisions:**
+
+1. **Ablate StatPredictor only, not POB.** POB is a derived classifier; ablation results would be noise on top of noise. StatPredictor is the headline metric. Halves the compute budget.
+
+2. **Ablate by feature group, not individual columns.** Use `FEATURE_GROUP_PREFIXES` from `config.py` (already built for this purpose). Groups for player pipeline: `rolling`, `context`, `usage`, `advanced`. Each group dropped independently per run.
+
+3. **DST feature groups are different from player.** Player pipeline ablates {rolling, context, usage, advanced}; DST ablates {rolling_def, opp_offense, context_dst}. Keep the two ablation sweeps separate so rules-of-thumb stay position-coherent.
+
+4. **Threshold for dropping.** Ablation removes the group → MAE goes UP if the group helped. If removing group G makes MAE worse by < 0.05 (overall) → group G provided no measurable signal → drop from production. Threshold of 0.05 is V4-era convention; revisit if early ablation runs show stat-level deltas dominate the average.
+
+5. **Fixed eval window.** Use the same walk-forward 2021-2024 split as Task 3.2 — never re-tune the split mid-ablation (would invalidate comparisons).
+
+6. **Don't ablate per-position-per-stat — ablate at position level.** Aggregate MAE per position is the decision unit. Per-stat results are reported but not gated on. Avoids chasing noise on rare-event stats (rushing_tds, fg_made).
+
+**Implementation plan:**
+- [ ] Create `src/nfl/training/v5/ablation.py`:
+  - `ABLATION_GROUPS = {'player': ['rolling', 'context', 'usage', 'advanced'], 'dst': ['rolling_def', 'opp_offense', 'context_dst']}`
+  - `run_ablation(group_to_remove, positions, eval_seasons)` — calls walk-forward training with that group's columns dropped from feature matrix; returns per-stat MAE
+  - `compare_to_baseline(baseline_mae, ablation_results)` — computes delta per position/stat
+  - `apply_drop_threshold(deltas, threshold=0.05)` — returns groups to keep + groups to drop
+- [ ] Add DST FEATURE_GROUP_PREFIXES to config.py if not yet (`'rolling_def'`, `'opp_offense'`, `'context_dst'`) and `get_dst_feature_columns_by_group()` helper.
+- [ ] Tests in `tests/test_v5_ablation.py`:
+  - Group dropping actually removes the right columns (synthetic feature df + assert column lists)
+  - Threshold logic correctly identifies drop candidates
+  - Smoke: run ablation on TE/receptions removing 'usage' group, completes in <30s, returns numeric MAE
+- [ ] Create `colab/v5_ablation.ipynb`:
+  - Mount Drive, paths, **high-RAM/CPU check**, install ML libs
+  - Step: load baseline MAE summary (from Task 3.2 output)
+  - Resumable per (group_removed, position) — check for existing `_ablation_{position}_remove_{group}.csv` artifacts
+  - Run loop: 4 player groups × 5 player positions + 3 DST groups × 1 DST position = **23 ablation runs**. Each is one full walk-forward training run for 1 position (not all 6) — much cheaper than 3.2's 54-ensemble run.
+  - Estimated runtime per ablation run: ~10-30 min for player position; ~1 min for DST. Total: 4-12 hours on Colab Pro. Pro+ recommended for background execution.
+  - Step: aggregate results into `_ablation_summary.csv` (columns: position, group_removed, mae_with_group, mae_without_group, delta, drop_decision)
+- [ ] **Deliverable:** `_ablation_summary.csv` + decision document `docs/progress/{date}_ablation_results.md` listing groups kept/dropped per position with rationale + final feature list for Task 3.2c.
+- **>>> HANDOFF POINT #3:** User runs `colab/v5_ablation.ipynb`. Estimated 4-12 hours on Colab Pro (consider Pro+ for background). Claude resumes to analyze deltas and write the decision document.
+
+**Risks / pre-flight checks:**
+- 0.05 threshold is per-position-aggregate; some stats may have larger deltas (e.g., NGS may help passing_yards but not rushing). Sub-group keep/drop is acceptable if results clearly show it. Document case-by-case.
+- If a feature group's contribution is mixed across stats, the safer call is to keep it (small bloat) — only drop on clear "no signal" verdicts.
+- DST has small dataset → ablation MAE deltas may be noisy. Consider reporting DST ablation as exploratory only; default to keeping all DST groups unless one is clearly hurting.
+- Task 3.2 must finish first to provide baseline MAE. Don't start until 3.2 results are in DB-ready form.
+- Heaviest task in Phase 3 by wall-clock. Plan accordingly — user may want to run overnight.
+
+### Task 3.2c — Final V5 retrain + DB load (**Medium** — production model + predictions integration)
+
+**Goal:** Retrain V5 with ablation-validated feature set on all 2020-2025 data. Generate 2025 weekly predictions for V1-V5 cross-version comparison in the database. Load both player and DST predictions into the existing `predictions` table.
+
+**Key architecture decisions:**
+
+1. **Production model = full data, no eval split.** Eval was Task 3.2's job. Production uses every available training row (2020-2025). Justification: walk-forward eval validated the model class; production retrain just maximizes data for next season's predictions.
+
+2. **2025 predictions for portfolio comparison.** Generate per-week predictions for the 2025 season (already played, actuals available). Load into `predictions` table alongside V1-V4 → enables V1→V5 MAE bar chart in the dashboard. Production predictions for 2026 season come AFTER 2026 W1 raw data lands (separate ongoing pipeline, not part of this task).
+
+3. **DST predictions reuse `predictions` schema.** No new table. DST rows stored with `player_id = team_abbr` (e.g., 'KC'), `player_name = team full name` (lookup via team_stats or hardcoded map), `position = 'DST'`, `team = team_abbr`, `opponent = opponent_team`. Stat names: `sacks`, `interceptions`, etc. (same as STATS_TO_PREDICT['DST']). Plus a synthetic `fantasy_points_dst` row per team-week so dashboard can compare DST fantasy scoring across versions.
+
+4. **Backfill `actual_value` for 2025 predictions.** Reuse `load_predictions.py` pattern: after inserting predictions, UPDATE `actual_value` from `weekly_stats` (player) or compute from `team_stats` (DST). Compute `error = predicted_value - actual_value` for accuracy queries.
+
+5. **Model versioning in DB.** Insert into `model_versions` table: `version='v5'`, `description='V5 with ablation-validated features + DST'`, `n_features=<count>`, `n_models=54`, `train_seasons='2020-2025'`. Required by FK from predictions table.
+
+6. **MAE verification step.** Before declaring task done, run `SELECT version, position, AVG(ABS(error)) FROM predictions WHERE actual_value IS NOT NULL AND season=2025 GROUP BY version, position` and assert V5 numbers are within target bands. Fail loudly if a position regressed badly vs V4 (>0.5 MAE worse) — likely a bug, not a model failure.
+
+**Implementation plan:**
+- [ ] Create `src/nfl/training/v5/final_retrain.py`:
+  - Reads ablation-validated feature list from Task 3.2b output
+  - Trains 54 ensembles on full 2020-2025 data (no eval holdout)
+  - Generates 2025 weekly predictions (one row per (player_id, season, week, stat, model_type))
+  - Saves models to `data/nfl/models/v5_final/` (separate dir from 3.2's eval models — these are the ones used in production)
+  - Saves predictions to `data/nfl/predictions/v5/predictions_{season}_week_{week}.parquet`
+- [ ] Extend `src/nfl/db/load_predictions.py` to handle V5:
+  - Add V5 to the version registry
+  - Add DST handling — `position == 'DST'` rows skip the players-table FK-style lookup; use team_abbr as player_id directly
+  - For DST `actual_value` backfill, query `team_stats` via (season, week, team) and pull the relevant defensive stat (sacks, interceptions, etc.). For `fantasy_points_dst` actuals, compute via `compute_dst_fantasy_points` from team_stats raw columns.
+  - Insert V5 row into `model_versions` table before predictions insert (FK ordering — see Task 2.3 lessons)
+- [ ] Tests in `tests/test_v5_final_retrain.py`:
+  - Final model loads + predicts on a single feature row without error
+  - Predictions DataFrame has all required columns (matches load_predictions.py expectations)
+  - DST prediction rows: player_id is a team abbr, position is 'DST', stat is in DST stat list
+  - 2025 predictions row count ≈ expected (5 player positions × ~weekly active players × stats + DST 32 teams × stats)
+- [ ] Tests in `tests/test_load_predictions.py` (extend existing):
+  - V5 player predictions load correctly
+  - V5 DST predictions load with synthetic team_abbr player_id
+  - actual_value backfill works for both player and DST
+  - Re-run does not duplicate (TRUNCATE+INSERT pattern from Task 2.3)
+- [ ] Create `colab/v5_final_retrain.ipynb`:
+  - Mount Drive, paths, **high-RAM/CPU check**, install ML libs
+  - Step: load ablation-validated feature list (from Task 3.2b artifact uploaded to Drive)
+  - Step: train 54 final ensembles on full data (no eval) — resumable per ensemble
+  - Step: generate 2025 week-by-week predictions
+  - Step: download predictions Parquets back to local `data/nfl/predictions/v5/`
+  - Step: spot-check (Mahomes 2025 W5 predicted_passing_yards in plausible range; KC 2025 W1 DST predicted_sacks > 0)
+- [ ] After Colab run completes, run locally: `python -m src.nfl.db.load_predictions --version v5` to load into PostgreSQL
+- [ ] Run verification SQL: `SELECT version, position, AVG(ABS(error)) AS mae FROM predictions WHERE actual_value IS NOT NULL AND season=2025 GROUP BY version, position ORDER BY version, position;` — produces the V1→V5 comparison table
+- [ ] **Deliverable:** Final V5 model in `data/nfl/models/v5_final/`, 2025 predictions in `data/nfl/predictions/v5/` AND in PostgreSQL `predictions` table with `actual_value` backfilled
+- [ ] **Target MAE (carried from V5_QUESTIONS.md):** < 4.0 overall. Position-specific: TE < 3.5, RB < 4.5, WR < 4.5, QB < 6.5. K and DST: targets TBD after first run (no V4 baseline).
+- **>>> HANDOFF POINT #4:** User runs `colab/v5_final_retrain.ipynb` (estimated 1-2 hours). Claude resumes to load results into DB and verify MAE bands.
+
+**Risks / pre-flight checks:**
+- DST team-name lookup needs a stable source. Easiest: hardcode team abbr → full name map in load_predictions.py (32 entries, doesn't change). Add a test that asserts all 32 NFL team abbrs are mapped.
+- `predictions` table has `player_id TEXT` — accepts team abbrs. But existing indexes may not be optimized for DST lookup patterns. If dashboard queries get slow on DST rows, add `idx_predictions_dst ON predictions (position) WHERE position = 'DST'`.
+- 2025 partial season risk — if running mid-season, week count is incomplete. Filter predictions to `actual_value IS NOT NULL` for accuracy comparisons.
+- Production 2026 inference is OUT OF SCOPE for this task. Task 4.x will build the live inference pipeline (separate from training).
+- If V5 MAE misses targets, do NOT silently ship. Document the gap, decide whether to iterate (more features, hyperparameter tuning) or accept (portfolio talking point: "V5 missed target X by Y; here's what we learned"). User-driven decision.
+
+### Task 3.3 — Prediction accuracy dashboard (**Medium** — Streamlit visualization)
+
+**Goal:** Visualize V1→V5 accuracy progression in a Streamlit dashboard backed entirely by PostgreSQL queries on the `predictions` table. Portfolio-grade: someone reviewing the project should grasp model evolution, current accuracy, and per-position strengths/weaknesses in under 60 seconds. Ships as a NEW page (not a rewrite of `app.py` — that's Task 4.1).
+
+**Key architecture decisions:**
+
+1. **PostgreSQL-only data source.** No Parquet reads. All charts are powered by SQL on the `predictions` table (which has `actual_value` and `error` already backfilled by Task 3.2c). One file (`pages/accuracy.py`) + one query module (`src/nfl/db/queries_accuracy.py`).
+
+2. **DST shown alongside player positions.** The dashboard treats DST as a 6th position with its own MAE row. Stat-level breakdown (sacks MAE, INTs MAE, etc.) shown in a drill-down table, not the headline chart.
+
+3. **Per-version-per-stat MAE table is the foundation.** All 5 charts derive from one core query: `SELECT version, position, stat, COUNT(*), AVG(ABS(error)) AS mae FROM predictions WHERE actual_value IS NOT NULL GROUP BY version, position, stat`. Cache it with Streamlit's `@st.cache_data` (TTL=1 hour or invalidate on prediction-table refresh).
+
+4. **Charts (all interactive Plotly):**
+   - **Headline:** MAE by version (V1→V5) — single bar chart, overall fantasy_points MAE
+   - **Per-position grouped bars:** version × position MAE matrix (6 positions × 5 versions = 30 bars)
+   - **Per-stat table:** filterable per (version, position) → drill down to stat-level MAE
+   - **Predicted vs actual scatter:** per-position, per-version filter, regression line + R² overlay (~7,000 points per filter combo, downsample if needed)
+   - **Per-week MAE trend line:** does accuracy degrade in late season? Useful insight if true (suggests model is stale-data-biased).
+   - **Feature importance bar chart:** loaded from Task 3.2's `_ablation_summary.csv` (kept/dropped groups + their MAE contribution). Static — refreshes only when ablation re-runs.
+
+5. **Coexistence with the broken app.py.** Old `app.py` still uses legacy per-week raw files and is broken. Add the accuracy page as a new entry point: `streamlit run pages/accuracy.py` — does NOT touch `app.py`. Task 4.1 will rebuild `app.py` and integrate this page properly.
+
+6. **Filter UX.** Sidebar filters: version multiselect (default = all V1-V5), position multiselect (default = all), season filter (default = 2025 since that's the cross-version comparison year). Filters update all charts in real time via Streamlit reactivity.
+
+**Implementation plan:**
+- [ ] Create `src/nfl/db/queries_accuracy.py`:
+  - `mae_by_version(versions, seasons)` → DataFrame: version, mae
+  - `mae_by_version_position(versions, seasons)` → DataFrame: version, position, mae
+  - `mae_by_version_position_stat(versions, seasons)` → DataFrame: version, position, stat, mae, n_predictions
+  - `predictions_vs_actuals(version, position, season)` → DataFrame: predicted, actual (for scatter)
+  - `mae_by_week(version, season)` → DataFrame: week, mae (for trend line)
+- [ ] Create `pages/accuracy.py` (Streamlit page):
+  - Sidebar filters (version, position, season)
+  - 5 chart sections, top to bottom
+  - Use `st.cache_data(ttl=3600)` on each query function
+- [ ] Tests in `tests/test_queries_accuracy.py`:
+  - Each query function returns expected schema (column names + types)
+  - mae_by_version returns 5 rows (V1-V5) when all are loaded
+  - DST rows surface in mae_by_version_position with position='DST'
+  - Empty-result handling (e.g., position with no predictions yet) returns empty DataFrame, not error
+- [ ] Manual UX test: launch dashboard, click through filter combinations, verify no errors, verify numeric ranges plausible
+- [ ] **Deliverable:** Working `pages/accuracy.py` + tested query module. Run with `streamlit run pages/accuracy.py`.
+
+**Risks / pre-flight checks:**
+- Depends entirely on Task 3.2c loading V5 + DST predictions correctly. If 3.2c is incomplete, dashboard will show only V1-V4. Verify `SELECT DISTINCT version FROM predictions;` shows v1, v2, v3, v4, v5 before starting build.
+- Scatter plot at full resolution (~7K points per position×version) may be slow to render. Plotly `px.scatter` handles 10K+ fine; if not, switch to `px.density_heatmap` or downsample to 2K random samples per filter.
+- Per-week MAE trend may be confounded by sample-size variance (W18 has fewer games due to late-season rest). Show n_predictions on hover so user can sanity-check thin weeks.
+- Streamlit `pages/` convention requires `app.py` exists at root with a sidebar nav — if `app.py` is broken, may need a stub `app.py` or a separate Streamlit entry. Decide during build phase.
+- Feature importance chart depends on Task 3.2b output. If ablation hasn't run, hide that section with a "Run Task 3.2b first" placeholder.
 
 ---
 
