@@ -271,13 +271,37 @@ class TestWalkForward:
         captured: list[dict] = []
 
         # Wrap the prepare function so we can inspect the (season, week) range
-        # of every train slice walk_forward_eval feeds it.
+        # of every train slice walk_forward_eval feeds it. We tag each capture
+        # with its role ("train" vs "eval") rather than assuming train/eval
+        # interleave perfectly — if eval prepare() were to raise (KeyError on
+        # a missing column, ValueError on a negative count stat), only the
+        # train capture would land and a positional [::2] slice would misalign
+        # on subsequent folds. Role-tagging keeps the filter correct under any
+        # fold-skipping pattern.
         from src.nfl.training.v5 import data as v5data
+        import src.nfl.training.v5.walkforward as v5wf
         original_prepare = v5data.prepare_stat_predictor_data
 
+        # Track role via caller-passed dataframe size (train_df always has ≥20
+        # rows from the min_train_rows guard; eval_df is a single (season, week)
+        # slice = ≤ players count). Simpler and role-agnostic approach: count
+        # calls per fold by flipping a toggle. Walk-forward always calls train
+        # first, then eval — no branch can hit eval without hitting train first.
+        _next_role = {"value": "train"}
+
         def spying_prepare(df, stat, position):
-            X, y, cols = original_prepare(df, stat, position)
+            role = _next_role["value"]
+            _next_role["value"] = "eval" if role == "train" else "train"
+            try:
+                X, y, cols = original_prepare(df, stat, position)
+            except Exception:
+                # Restore toggle if prepare raises — walk_forward_eval's
+                # except-block will skip the rest of this fold, meaning the
+                # NEXT call starts a fresh fold (back to "train").
+                _next_role["value"] = "train"
+                raise
             captured.append({
+                "role": role,
                 "n_rows": len(df),
                 "max_season": int(df["season"].max()),
                 "max_week_in_max_season": int(df[df["season"] == df["season"].max()]["week"].max()),
@@ -285,8 +309,6 @@ class TestWalkForward:
             return X, y, cols
 
         v5data.prepare_stat_predictor_data = spying_prepare
-        # Also patch the import in walkforward module
-        import src.nfl.training.v5.walkforward as v5wf
         v5wf.prepare_stat_predictor_data = spying_prepare
         try:
             preds = walk_forward_eval(
@@ -304,14 +326,11 @@ class TestWalkForward:
 
         assert not preds.empty
         assert (preds["season"] == 2023).all()
-        # captured contains BOTH train and eval prepares per fold (interleaved).
-        # Train calls have max_season ≤ 2023 AND for season 2023, max_week strictly
-        # less than the eval week for that fold.
-        # Just verify: no train call ever included rows with season=2023 AND
-        # week == max(eval weeks) for that fold's predict step.
-        # Coarse check: training never includes the maximum eval week.
+        # Filter by role tag — defensive against any future fold-skipping path
+        # that might call prepare() for only one of train/eval per fold.
         max_eval_week = int(preds[preds["season"] == 2023]["week"].max())
-        train_calls = captured[::2]  # every other call is train (train, eval, train, eval, ...)
+        train_calls = [c for c in captured if c["role"] == "train"]
+        assert train_calls, "No training prepare calls recorded — test failed to spy"
         for tc in train_calls:
             if tc["max_season"] == 2023:
                 assert tc["max_week_in_max_season"] < max_eval_week, (

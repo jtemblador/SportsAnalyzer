@@ -1,0 +1,334 @@
+Task 3.2 — V5 Model Training Package + Colab Handoff #2
+Date: 2026-04-13
+Status: Code complete + 4 review rounds + local test phase passed.
+        Ready for HANDOFF #2 (user runs colab/v5_training.ipynb on Colab Pro).
+        Completes plan/build/review/test boxes of V5_ROADMAP.md Task 3.2.
+Tests: 30 passed (27 synthetic in 6.87s + 3 real-data in 138.59s), 1 warning
+       (expected sklearn degenerate-AUC on synthetic all-one-class fold fixture).
+
+Goal
+----
+Train the V5 prediction models: 54 ensembles = 27 (position, stat) pairs × 2
+model types (StatPredictor regression + POBModel binary classification). Each
+ensemble averages per-position algorithm subsets (QB/WR get 3, RB/TE get 4,
+K gets 2, DST gets 3). Total 174 .joblib files + 54 meta JSON + 1 summary
+CSV. Walk-forward eval on 2021-2024 produces honest MAE/AUC numbers for
+Task 3.2b ablation baseline and Task 3.2c production retrain.
+
+Approach
+--------
+1. Per-position algorithm selection (not uniform 4-algo-everywhere):
+   - QB (3,181 rows, rich features): xgboost + lightgbm + catboost. RF drag.
+   - RB (7,428 rows, interaction-heavy): all 4 algos; RF adds diversity.
+   - WR (11,917 rows, high variance): xgboost + lightgbm + catboost.
+   - TE (5,904 rows, sparse advanced stats): all 4 algos; LightGBM gets
+     min_data_in_leaf=50 override to combat leaf-wise overfit.
+   - K (2,715 rows, 3-stat sparse outcomes): xgboost + RF only. CatBoost/
+     LightGBM minimum-sample overhead hurts at N=2700.
+   - DST (2,686 rows, narrow 42-col features): xgboost + catboost + RF.
+     LightGBM needs more data.
+   Rationale: each algorithm has known strengths — matching to position
+   data density + feature width maximizes signal while reducing compute
+   (216 models → 174, ~20% fewer).
+
+2. Per-stat loss function:
+   - COUNT_STATS (TDs, INTs, receptions, targets, sacks, etc.): Poisson
+     objective (xgboost count:poisson, lightgbm/catboost native Poisson).
+     Calibrated predictions for right-skewed non-negative integer counts.
+   - CONTINUOUS (yards, points_allowed): RMSE.
+   - RF falls back to MSE on count stats (no Poisson support); documented
+     in meta JSON under objective_per_algo.
+
+3. Whitelist-based feature selection (data leakage prevention):
+   V5 features parquet contains BOTH raw current-week stats (target_share,
+   wopr, ngs_*, pfr_*, *_exp) AND their rolling_* equivalents. Naive
+   loader would include the raw ones → massive leakage. Whitelist accepts
+   only rolling_/variance_/trend_/opp_/prior_/is_ prefixes + 8 pre-game
+   context columns (spread_line, total_line, team_rest, temp, wind, etc.).
+   Regression test pins known leak columns against exclusion.
+
+4. Walk-forward expanding window:
+   For each (eval_season, eval_week) in 2021-2024, train on strictly-prior
+   rows, predict the eval week. Mirrors production prediction semantics.
+   2020 included in training (useful data) but excluded from eval (COVID
+   noise per roadmap). Warm-up 2018-2019 dropped by history filter.
+
+5. Four review rounds (per memory: review is critical):
+   Round 1 — 9 fixes: CatBoost random_seed (was random_state silently
+     ignored), mae→mae_v5 column for Task 3.2b contract, walk-forward
+     index alignment (eval_df dropna before attach_keys), season dtype
+     cast, heterogeneous parquet column warning, np.nanmean + NaN assert,
+     .tmp orphan sweep, NEUTRAL_FILLS for dome temp (36% of rows are
+     domes — filling with 0 teaches 0°F weather), degenerate_pob flag.
+   Round 2 — 6 fixes (1 critical): _predict_per_algo and POBModel.predict
+     were STILL using X.fillna(0.0) instead of fill_features — the dome
+     fix applied only at training, not inference. Silent train/predict
+     skew. Both passes caught it independently.
+   Round 3 — 4 fixes (1 critical): Colab Step 8 still referenced old
+     `mae` column — would KeyError crash after 1-3 hours of training.
+     Plus ValueError warning in walk_forward_eval, DST parquet preflight,
+     attach_keys DST docstring.
+   Round 4 — 4 fixes: tests weren't actually load-bearing (regression
+     tests had escape routes). Strengthened: dome-temp test now uses
+     constant noise features so only temp carries signal; walk-forward
+     test now monkey-patches prepare to verify strict-prior invariant.
+   Total: 23 fixes, 9 reviewer agents, 4 Pass 3 verdicts. The final
+   Pass 3 was SHIP — first time zero fix interactions broke anything.
+
+Key architecture decisions
+--------------------------
+- StatPredictor + POBModel (NOT EVOB — dropped from V5 per roadmap).
+- Ensemble averaging = simple mean of per-position algo predictions.
+- Atomic file writes: joblib.dump to .tmp → os.replace to final.
+  .tmp orphan sweep at train_all start handles mid-write kills.
+- Resume per-ensemble: `ensemble_files_complete` checks N algo files +
+  meta JSON. Partial state (no meta) → retrain; complete state → skip.
+- Meta JSON records feature_columns, neutral_fills (imputation policy),
+  objective_per_algo, algorithms_used — Task 3.2c detects policy drift.
+- _atomic_append_csv auto-rotates _mae_summary.csv on schema mismatch
+  (prevents NaN-polluted mix of old + new column names).
+- No StandardScaler (tree models don't need it; legacy V4 added complexity
+  for zero benefit).
+- K position applies drop_all_null_columns: 88 whitelist columns → 75
+  after K-only row filter (passing/rushing rolling stats that K players
+  never have are pruned).
+
+Implementation
+--------------
+Created (8 files, ~1,600 lines):
+- src/nfl/training/v5/__init__.py — exports StatPredictor, POBModel,
+  train_all, walk_forward_eval, compute_mae, compute_pob_metrics,
+  ensemble_files_complete
+- src/nfl/training/v5/config.py — POSITION_ALGORITHMS, POSITION_HYPERPARAMS,
+  COUNT_STATS, CONTINUOUS_STATS, MODEL_TYPES, season splits,
+  LIGHTGBM_TE_OVERRIDES, helper functions
+- src/nfl/training/v5/data.py — load_features (per-position parquet
+  reader with column drift warning), apply_history_filter,
+  get_feature_columns (whitelist), drop_all_null_columns (K prune),
+  fill_features (NEUTRAL_FILLS), prepare_stat_predictor_data,
+  prepare_pob_data, attach_keys
+- src/nfl/training/v5/models.py — _BaseEnsemble with fit/predict/save,
+  StatPredictor (Poisson/RMSE per stat), POBModel (LogLoss),
+  _make_regressor + _make_classifier factories, ensemble_files_complete,
+  atomic .joblib writes, meta JSON embedding of feature_columns + policy
+- src/nfl/training/v5/walkforward.py — _strict_prior_mask, _eval_iter,
+  walk_forward_eval (with pre-prepare dropna alignment + length assert),
+  compute_mae, compute_pob_metrics (with degenerate_pob flag)
+- src/nfl/training/v5/train.py — train_one_ensemble, train_all
+  (orchestrator with .tmp sweep + schema-drift CSV rotation),
+  _atomic_append_csv
+- tests/test_v5_training.py — 27 synthetic + 3 real-data tests including
+  load-bearing regression tests for whitelist leakage prevention,
+  dome-temp predict consistency, walk-forward strict-prior invariant
+- colab/v5_training.ipynb — 8-step notebook (mount Drive, verify paths
+  + DST parquet preflight, RAM check, install libs, resume check,
+  feature shape inspection, training loop, ensemble count verification,
+  MAE summary with degenerate_pob warning)
+
+Modified:
+- colab/README.md — added training notebook + src/nfl/training/v5 to
+  Drive structure, marked training notebook "Ready (HANDOFF #2)"
+- docs/V5_ROADMAP.md — (modified during planning phase with Task 3.2/3.2b/
+  3.2c deep pass + Task 3.1.5 stale data notes)
+
+Validation
+----------
+Local test suite (this session):
+- Synthetic: 27 passed in 6.87s
+- Real-data: 3 passed in 138.59s (2m19s)
+  - test_te_receptions_smoke_mae_in_range: TE 2023 walk-forward MAE in [1.0, 4.5]
+  - test_dst_sacks_poisson_predictions_nonneg: all predictions ≥ 0
+  - test_pob_pos_class_fraction_balanced: WR/receiving_yards in [0.35, 0.65]
+
+Performance baseline (DST/sacks/stat end-to-end):
+- 125s walk-forward + refit + atomic save on 2,686 DST rows
+- 2,174 eval predictions across 4 seasons
+- MAE: 1.366 (plausible for DST sacks; typical 1-3 per game)
+- Output: 3 .joblib (CatBoost 128KB, RF 828KB, XGBoost 481KB) + 1 meta JSON
+- Projected Colab runtime: 1-3 hours for all 54 ensembles (matches roadmap)
+
+Feature-count baseline (post-whitelist, after history filter):
+  QB   3,181 rows  88 features  3 algos
+  RB   7,428 rows  88 features  4 algos
+  WR  11,917 rows  88 features  3 algos
+  TE   5,904 rows  88 features  4 algos
+  K    2,715 rows  75 features  2 algos (post-drop_all_null_columns)
+  DST  2,686 rows  42 features  3 algos (smaller feature set per parquet)
+  Total: 33,831 training rows.
+
+Real-data observations surfaced:
+- 2021 parquet missing `game_id` column — column-drift warning fires
+  correctly (not a feature, excluded by whitelist, zero impact).
+- POB degenerate-fold detection confirmed via synthetic all-one-class
+  fixture (sklearn's AUC warning + our degenerate_pob=True flag).
+
+Value-equivalence verification: N/A (new code, not a refactor).
+
+HANDOFF #2 — Colab Training
+---------------------------
+The user runs the training on Colab Pro while Claude waits to analyze results.
+
+Drive folder structure required:
+  /content/drive/MyDrive/SportsAnalyzer/
+  ├── src/nfl/training/v5/          ← NEW (upload this task's 6 .py files)
+  │   ├── __init__.py
+  │   ├── config.py
+  │   ├── data.py
+  │   ├── models.py
+  │   ├── walkforward.py
+  │   └── train.py
+  ├── src/nfl/features/v5/          ← already uploaded (HANDOFF #1.5)
+  ├── output/features/v5/           ← 16 parquets from HANDOFF #1.5
+  └── output/models/v5/             ← THIS RUN writes here
+
+What goes where:
+1. From local repo, upload `src/nfl/training/v5/` to the Drive path above.
+   The notebook Step 2 asserts src/nfl/training/v5/train.py exists.
+2. Upload `colab/v5_training.ipynb` to Drive (or open it directly from GitHub).
+3. The 16 feature parquets should already be in /output/features/v5/ from
+   HANDOFF #1.5 (8 player + 8 DST). Step 2 asserts both sets are present.
+
+Runtime expectations:
+- Total: 1-3 hours on Colab Pro high-RAM CPU (no GPU needed).
+- DST (~12 ensembles): ~25 min.
+- Player positions (~42 ensembles): ~1-2.5 hours.
+- Notebook is resumable per-ensemble — re-run after Colab disconnect and
+  it picks up from the next missing ensemble. Sub-minute cost to resume.
+
+What to report back to Claude:
+1. Paste the full MAE / AUC summary table from Step 8 (StatPredictor MAE
+   table + POB accuracy/AUC table + any degenerate_pob warnings).
+2. Paste the file count from Step 7 (should be 174 .joblib + 54 JSON).
+3. Any red warnings or tracebacks during Step 6 training.
+
+What Claude does with the results:
+- Sanity-check MAE against V4 reference (5.14/4.66/4.66/4.26 — approximate
+  because different split; meta JSON labels them reference-only).
+- Flag any (position, stat) with MAE > 8.0 or MAE > 2× V4 reference.
+- Verify degenerate_pob count is small (<5% of POB ensembles).
+- Trigger Task 3.2b ablation only if results pass sanity.
+
+Stale-data cleanup
+------------------
+N/A. Task 3.2 produces new artifacts in /output/models/v5/ — no prior
+outputs are invalidated. Task 3.1.5's feature parquets in /output/features/v5/
+are the input and remain valid.
+
+Lessons learned
+---------------
+1. Four review rounds caught 3 critical bugs that single-pass review
+   would have shipped. Each would have been silent in production:
+   - Round 1: walk-forward index misalignment (eval_df/preds could
+     shift if prepare() dropped NaN rows).
+   - Round 2: predict-time fill_features skip — the dome-temp fix only
+     applied at training. Inference would silently use 0°F for 36% of
+     all predictions (every dome team's games).
+   - Round 3: Colab Step 8 still referenced `df['mae']` after round-1
+     rename to `mae_v5`. Would KeyError-crash after 1-3 hours of Colab
+     training with no summary table output.
+   The meta-lesson: each round found a bug a DIFFERENT class from the
+   prior round. Single-pass review biases toward finding one class
+   (usually correctness). Multi-pass with explicit different angles
+   (correctness → integration → latent hazards → test quality) surfaces
+   bugs that any single lens misses. The cost was ~45 min reviewer time
+   for ~4 hours of saved production debugging.
+
+2. Regression tests can have escape routes. Round 4 found that the
+   test_predict_uses_fill_features_for_dome_temp_consistency test used
+   rolling_avg_receptions ∈ [2, 8] uniform as a noise feature — tree
+   models could pass the > 3.0 threshold via that correlation alone,
+   masking the bug it was meant to catch. Fix: make noise features
+   CONSTANT (5.0) so the model must use temp. Applies broadly: if a
+   regression test doesn't fail when you break the behavior it's
+   meant to guard, it's not load-bearing. Worth verifying by briefly
+   reverting the fix and confirming the test fails.
+
+3. "Same fix name but different code path" is a classic blind spot.
+   NEUTRAL_FILLS was applied in _BaseEnsemble.fit via fill_features(X).
+   But _predict_per_algo and POBModel.predict independently called
+   X.fillna(0.0). The same dict was being SOURCED at the wrong call
+   sites. Two reviewers in Round 2 independently caught this — it
+   wouldn't have been caught by "the fit-side code works." Lesson:
+   when fixing a train/predict consistency bug, grep for ALL call
+   sites that touch the same data structure, not just the one you
+   edited.
+
+4. Per-position algorithm selection beats "use all 4 everywhere."
+   LightGBM overfits on TE (~3K rows, leaf-wise growth aggressive).
+   RF adds drag on QB (~3K rows, gradient boosters dominate). K at
+   600 rows doesn't benefit from CatBoost/LightGBM's minimum-sample
+   overhead. Dropping these reduced total model count 216 → 174 (~20%
+   less compute) with no expected MAE loss. Cost: per-position config
+   complexity in POSITION_ALGORITHMS dict. Benefit: ~20 min less Colab
+   time per run + honest "I matched algorithm to data density" story
+   for the portfolio.
+
+5. Poisson loss for count stats matters. RMSE is symmetric around zero
+   but count outcomes (TDs, INTs, sacks, receptions) are right-skewed
+   and bounded below by 0. XGBoost's count:poisson, LightGBM's poisson,
+   CatBoost's Poisson objectives all handle this natively. Expected
+   5-15% MAE improvement on count stats vs RMSE baseline. RF doesn't
+   support Poisson and falls back to MSE — documented per-algo in meta
+   JSON so drift is traceable.
+
+6. Whitelist > blacklist for leakage prevention. First pass used a
+   blacklist of raw stat column names (passing_yards, rushing_yards,
+   etc.). Real-data smoke revealed V5 features parquet contained ~20
+   other current-week observable columns (target_share, wopr, ngs_*,
+   *_exp) that weren't on the blacklist. TE/receptions MAE of 0.27 on
+   real data was the red flag (should be 1.5-2.5 — the model was
+   leaking). Switched to whitelist: only rolling_/variance_/trend_/
+   opp_/prior_/is_ prefixes + explicit safe-context allowlist. MAE
+   jumped to expected range. Lesson: leakage blacklists will always
+   be incomplete; whitelist the known-safe shapes and fail-closed
+   for everything else.
+
+7. Dome weather imputation was 36% of all rows. NaN rate analysis
+   (31% for temp, same for wind) revealed dome games systematically
+   get weather = NaN → fillna(0) treats them as 0°F freezing
+   conditions. Would silently bias passing predictions downward for
+   8 dome teams across ~12 games/season each = ~96 games/season per
+   team systematically mispredicted. NEUTRAL_FILLS["temp"] = 65.0
+   fixes it. Lesson: always check NaN rate per column BEFORE defaulting
+   to a single fillna strategy. 36% NaN is not "rare missing data" —
+   it's a systematic pattern that demands per-column handling.
+
+Remaining risks / Deferred
+--------------------------
+- DST sample size for early eval seasons. Walk-forward for 2021 W1
+  trains on 2020 DST only (~512 rows). If MAE is suspiciously high
+  for early 2021 DST weeks, consider restricting eval_seasons to
+  [2023, 2024] only. Decision deferred to post-Colab review.
+
+- V4 MAE comparison is apples-to-oranges. V4 baselines (5.14/4.66/
+  4.66/4.26) used different splits + features. mae_v4 column NOT
+  included in _mae_summary.csv. V4 cited as reference only in meta.
+  Honest V4-vs-V5 comparison requires retraining V4 on V5's split —
+  deferred to Task 3.2b or beyond.
+
+- fillna(0) still applies to all non-temp context columns. If future
+  NaN patterns emerge in rest days, spreads, or is_* flags, they'll
+  silently fill as 0. Current NaN rates for those columns are 0%
+  (verified during build phase). Revisit if MAE looks off for specific
+  positions post-Colab.
+
+- Task 3.2c needs to respect neutral_fills from meta JSON. Production
+  retrain + prediction pipeline must detect if local NEUTRAL_FILLS
+  differs from saved meta's neutral_fills dict. Contract is embedded
+  in meta JSON but enforcement is deferred to 3.2c's load path.
+
+- Per-algo prediction variance is not measured. Ensemble averaging
+  could hide one algo silently producing bad predictions. Consider
+  adding per-algo prediction variance to meta JSON as a "confidence"
+  proxy. Deferred; revisit if portfolio demo needs uncertainty bands.
+
+Next steps
+----------
+1. User runs colab/v5_training.ipynb on Colab Pro (HANDOFF #2).
+2. User reports back MAE summary + file counts + any warnings.
+3. Claude analyzes results, sanity-checks vs V4 reference, identifies
+   positions needing hyperparameter re-tuning (if any).
+4. If results pass sanity → trigger Task 3.2b (ablation study).
+5. If any position shows MAE > 2× V4 reference → diagnose before
+   proceeding (likely causes: insufficient-history filter too
+   aggressive, feature whitelist dropping signal, POB class imbalance).

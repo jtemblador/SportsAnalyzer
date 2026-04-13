@@ -383,7 +383,7 @@ Notebooks are created per handoff (see each task below). Notebooks are **gitigno
 
 - [x] `colab/colab_test.ipynb` — verify Drive mount + data access + ML libraries
 - [x] `colab/v5_feature_engineering.ipynb` — runs feature engineering (paired with Task 3.1)
-- [ ] `colab/v5_training.ipynb` — runs training script (paired with Task 3.2)
+- [x] `colab/v5_training.ipynb` — runs training script (paired with Task 3.2) — READY, pending user HANDOFF #2 execution
 - [ ] `colab/v5_ablation.ipynb` — runs ablation study script (paired with Task 3.2b)
 - [ ] `colab/v5_final_retrain.ipynb` — runs final retrain + prediction generation (paired with Task 3.2c)
 
@@ -502,32 +502,21 @@ where points_allowed_bonus:
 7. **Predictions table integration (carries forward to 3.2c).** DST predictions reuse the existing `predictions` table schema with `player_id = team_abbr` (e.g., 'KC'), `player_name = team full name`, `position = 'DST'`, `team = team_abbr`, `opponent = opponent_team`. Permissive schema accommodates both per-player and per-team rows. No new table.
 
 **Implementation plan:**
-- [ ] Create `src/nfl/training/v5/` package (mirror features/v5/ structure):
-  - `config.py` — POSITION_HYPERPARAMS dict (QB depth=9, RB/WR=7, TE=6, K=3, DST=5), ALGORITHMS list, ENSEMBLE_WEIGHTS (default uniform), STAT_KEYS_BY_POSITION (mirrors STATS_TO_PREDICT)
-  - `data.py` — `load_features(positions, seasons)` returns concatenated player+DST DataFrame with feature/target/key columns, `apply_history_filter(df)` enforces MIN_GAMES_HISTORY, `compute_pob_target(df, stat)` adds POB binary label
-  - `models.py` — `StatPredictor(position, stat)` and `POBModel(position, stat)` classes wrapping the 4-algo ensemble. Both expose `.fit(X, y)`, `.predict(X)`, `.feature_importances()`. Reuse V4 base model patterns from `legacy/v1-v4/` where sensible.
-  - `walkforward.py` — `walk_forward_eval(model_class, features_df, eval_seasons)` — yields (train_idx, predict_idx) per (season, week), accumulates predictions + actuals + errors
-  - `train.py` — orchestrator entry point. For each (position, stat, type): instantiate model, run walk-forward, save artifacts, append to MAE summary table
-  - `__init__.py` — exports `train_all`, `walk_forward_eval`
-- [ ] Tests in `tests/test_v5_training.py`:
-  - Hyperparams config sane (depth/iter ranges per position)
-  - `apply_history_filter` drops rows where games_of_history < 3
-  - `compute_pob_target` drops NaN-baseline rows + correctly labels actual > baseline
-  - Walk-forward yields strictly-prior train indices for every predict week (synthetic 2-season fixture)
-  - Ensemble `.predict` returns mean of 4 algos within tolerance
-  - Smoke: train 1 model (e.g., TE/receptions/StatPredictor) on real 2021-2022 data in <30s, MAE within plausible bounds (1.5-4.0)
-- [ ] Create `colab/v5_training.ipynb` with required cells:
-  - Step 1: Mount Drive
-  - Step 2: Verify code + features uploaded (16 parquets present in features/v5/)
-  - Step 3: **High-RAM/CPU check** — `assert psutil.virtual_memory().total >= 20e9`
-  - Step 4: Install ML libs (`!pip install catboost xgboost lightgbm` if not present)
-  - Step 5: Resumable check — list which (position, stat, type) ensembles already have output `.joblib` + `_meta.json` files; build `missing` list
-  - Step 6: Run training loop over `missing` — per ensemble: load features → walk-forward eval → save 4 algo files + meta JSON → print per-stat MAE
-  - Step 7: Verify all 54 ensembles present (216 .joblib + 54 .json)
-  - Step 8: Print MAE summary table (per position, per stat, vs V4 baseline)
-- [ ] **Deliverable:** Trained V5 models (216 .joblib files + 54 metadata JSON) in `data/nfl/models/v5/`, MAE summary saved to `data/nfl/models/v5/_mae_summary.csv` (columns: position, stat, model_type, mae_v5, mae_v4, delta, n_predictions)
-- [ ] **Estimated runtime:** 1-4 hours on Colab Pro high-RAM CPU. DST is fast (~2 min for all 12 ensembles); player models dominate (QB/RB/WR/TE/K combined ~1-3.5 hours).
-- **>>> HANDOFF POINT #2:** User runs `colab/v5_training.ipynb` on Colab Pro. Claude resumes to analyze MAE results before triggering Task 3.2b.
+- [x] Created `src/nfl/training/v5/` package (6 files, ~1,600 lines): config.py (POSITION_ALGORITHMS per-position subsets + POSITION_HYPERPARAMS + COUNT_STATS for Poisson), data.py (whitelist feature selection + fill_features with NEUTRAL_FILLS for dome temp), models.py (StatPredictor + POBModel with atomic save + meta JSON recording neutral_fills policy), walkforward.py (strict-prior mask + eval_df alignment), train.py (orchestrator with .tmp sweep + schema-drift CSV rotation), __init__.py.
+- [x] Tests in `tests/test_v5_training.py` (27 synthetic + 3 real-data, 30 total): hyperparams sanity, apply_history_filter, compute_pob_target, walk-forward strict-prior invariant (monkey-patched prepare verifies actual invariant), ensemble predict returns mean, TE/receptions real-data smoke + DST Poisson non-negative + WR POB balance. Plus load-bearing regressions: whitelist blocks known leakage columns, fill_features temp=65 consistency across train+predict, meta JSON records neutral_fills, degenerate_pob flag.
+- [x] Created `colab/v5_training.ipynb` (8 cells): mount Drive, verify paths + DST parquet preflight, high-RAM check, install ML libs, resume check, feature shape inspection, training loop with monkey-patched path helpers, ensemble count verification, MAE summary with degenerate_pob warning.
+- [x] **Deliverable planned:** 174 .joblib files (not 216 — per-position algo subsets) + 54 metadata JSON in `output/models/v5/`, `_mae_summary.csv` with columns: version, position, stat, model_type, algorithms, n_train_rows, n_features, n_eval_predictions, status, trained_at, mae_v5 (or accuracy/auc/pos_class_frac/degenerate_pob for POB).
+- [x] **Estimated runtime:** 1-3 hours on Colab Pro high-RAM CPU. Local baseline: DST/sacks/stat = 125s end-to-end. Naive 54x extrapolation = 112 min; realistic accounting for player-position row counts = 1-3 hours.
+- **>>> HANDOFF POINT #2:** User runs `colab/v5_training.ipynb` on Colab Pro. Claude resumes to analyze MAE results before triggering Task 3.2b. **READY** — see `docs/progress/2026-04-13_task_3.2_v5_training.txt` HANDOFF section.
+
+**Code-quality enhancements beyond original plan (from 4 review rounds, 23 fixes):**
+- [x] Whitelist-based feature selection (prefix-match only, prevents current-week leakage via ngs_*, pfr_*, target_share, *_exp that the V5 parquet contains alongside rolling equivalents).
+- [x] Poisson loss for count stats (xgboost count:poisson, lightgbm/catboost native Poisson); RF falls back to MSE.
+- [x] NEUTRAL_FILLS for dome games (temp=65.0; 36% of rows are domes where filling with 0 would train "0°F weather").
+- [x] Walk-forward eval_df dropna alignment + length assertion (prevents index misalignment bug).
+- [x] Atomic .joblib writes + .tmp orphan sweep + schema-drift CSV rotation (survives Colab disconnects).
+- [x] Meta JSON embeds neutral_fills + feature_columns + objective_per_algo so Task 3.2c detects policy drift.
+- [x] degenerate_pob flag (pos_class_frac < 0.05 or > 0.95) surfaces misleading-accuracy folds.
 
 **Risks / pre-flight checks:**
 - DST model count is small (~4,254 rows for training; walk-forward may leave only ~500-1000 rows for early-eval seasons). Possible solution: pool DST with a longer history window OR reduce eval to 2023-2024 only. Decide after first MAE pass.
