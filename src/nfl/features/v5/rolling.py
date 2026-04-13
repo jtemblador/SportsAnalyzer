@@ -5,21 +5,12 @@ All use strictly prior weeks (no data leakage into current-week features).
 """
 
 import pandas as pd
-import numpy as np
-from src.nfl.features.v5.config import (
-    ROLLING_DECAY, ROLLING_WINDOW, CORE_STATS_FOR_ROLLING
+from src.nfl.features.v5.config import ROLLING_WINDOW, CORE_STATS_FOR_ROLLING
+from src.nfl.features.v5.utils import (
+    rolling_decay_avg_series,
+    rolling_variance_series,
+    rolling_trend_series,
 )
-
-
-def _decay_weighted_avg(values, decay=ROLLING_DECAY):
-    """Compute decay-weighted average. Values are in chronological order
-    (oldest first). Most-recent values get highest weight."""
-    if len(values) == 0:
-        return np.nan
-    # Reverse so most recent is first, then decay
-    rev = values[::-1]
-    weights = np.array([decay ** i for i in range(len(rev))])
-    return np.sum(rev * weights) / np.sum(weights)
 
 
 def add_rolling_features(df, window=ROLLING_WINDOW, stats=None):
@@ -35,8 +26,14 @@ def add_rolling_features(df, window=ROLLING_WINDOW, stats=None):
     Returns:
         DataFrame with added columns:
         - rolling_avg_<stat>: decay-weighted average of past N games
-        - variance_<stat>: std dev of past games
+        - variance_<stat>: std dev of past games (column name kept for compat)
         - trend_<stat>: recent 3 vs older games percentage change
+
+    Position-safety: uses `groupby(...).transform(...)`, which preserves the
+    original DataFrame index regardless of group iteration order. The prior
+    list-append + bulk-assign pattern was correct only because the input was
+    sorted+reset_index — an unguarded contract. Transform makes that contract
+    structural rather than implicit.
     """
     if stats is None:
         stats = [s for s in CORE_STATS_FOR_ROLLING if s in df.columns]
@@ -48,44 +45,17 @@ def add_rolling_features(df, window=ROLLING_WINDOW, stats=None):
     # insufficient-history rows or flag rookies for special handling.
     df['games_of_history'] = df.groupby('player_id', sort=False).cumcount()
 
+    # INTENTIONAL: group by player_id only (not [player_id, season]).
+    # V5_ROADMAP specifies 2018-2019 as warm-up seasons so that Week 1 of
+    # 2020 has a full rolling lookback window from 2019 tail games. This
+    # cross-season history is desired throughout training (2020-2025) so
+    # that Week 1 of each new season uses the prior season's tail, not
+    # empty history. See docs/V5_ROADMAP.md "Season Range: 2018-2025".
+    grouped = df.groupby('player_id', sort=False)
     for stat in stats:
-        rolling_avg = []
-        variance = []
-        trend = []
-
-        # INTENTIONAL: group by player_id only (not [player_id, season]).
-        # V5_ROADMAP specifies 2018-2019 as warm-up seasons so that Week 1 of
-        # 2020 has a full rolling lookback window from 2019 tail games. This
-        # cross-season history is desired throughout training (2020-2025) so
-        # that Week 1 of each new season uses the prior season's tail, not
-        # empty history. See docs/V5_ROADMAP.md "Season Range: 2018-2025".
-        for player_id, group in df.groupby('player_id', sort=False):
-            values = group[stat].values
-            for i in range(len(values)):
-                # Use prior N games only (strictly before current)
-                past = values[max(0, i - window):i]
-                past = past[~pd.isna(past)]
-
-                # Rolling avg (decay-weighted)
-                rolling_avg.append(
-                    _decay_weighted_avg(past) if len(past) > 0 else np.nan
-                )
-
-                # Variance
-                variance.append(np.std(past) if len(past) >= 2 else np.nan)
-
-                # Trend: (recent 3 - older) / older
-                if len(past) >= 4:
-                    recent = np.mean(past[-3:])
-                    older = np.mean(past[:-3])
-                    trend.append(
-                        (recent - older) / older if older != 0 else 0.0
-                    )
-                else:
-                    trend.append(np.nan)
-
-        df[f'rolling_avg_{stat}'] = rolling_avg
-        df[f'variance_{stat}'] = variance
-        df[f'trend_{stat}'] = trend
+        col = grouped[stat]
+        df[f'rolling_avg_{stat}'] = col.transform(rolling_decay_avg_series, window=window)
+        df[f'variance_{stat}'] = col.transform(rolling_variance_series, window=window)
+        df[f'trend_{stat}'] = col.transform(rolling_trend_series, window=window)
 
     return df

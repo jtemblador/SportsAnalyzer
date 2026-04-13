@@ -1,0 +1,215 @@
+Task 3.1.5 — V5 DST (Defense/Special Teams) Feature Engineering
+Date: 2026-04-13
+Status: Code complete + 3 review passes + position-safety refactor. Ready for Colab handoff #1.5 (re-run player + DST together).
+Tests: 312 passed, 1 skipped (pre-existing Barkley bye-week skip). 17 new DST tests added.
+
+Goal
+----
+Add a 6th fantasy position (DST) to V5 as a parallel team-week pipeline.
+Mirrors the player pipeline architecture but operates at the (team, season,
+week) grain instead of (player_id, season, week). Produces 6 predicted
+defensive stats per team-week (sacks, INTs, fumble_recoveries, def_tds,
+safeties, points_allowed) feeding 12 future DST models in Task 3.2.
+Industry-standard ESPN/Yahoo/NFL.com/Sleeper scoring formula.
+
+Approach
+--------
+1. Two-subagent build (sequential, not parallel):
+   - Subagent 1: config additions + master_table foundation + scoring helpers
+   - Subagent 2: rolling + opponent_offense + context + orchestrator + engineer wiring
+   Sequential because both touch dst.py. Subagent 1 establishes the API contract;
+   Subagent 2 builds against it.
+
+2. Three review passes (per memory: "review is critical, never skip or rush"):
+   - Pass 1 caught 3 issues: duplicate _decay_weighted_avg, weak rolling test,
+     missing DST docstring note in build_features.
+   - Pass 2 caught 1 brittleness bug: `DataFrame.get(col, 0).fillna(0)` would
+     crash if any optional column went missing in a future nflverse release
+     (returns int 0; int has no .fillna).
+   - Pass 3 caught a latent silent-corruption hazard: list-append + bulk-assign
+     pattern in rolling.py and dst.py was correct only because input was
+     sorted+reset_index — implicit, unguarded contract.
+
+3. Option-B refactor (user choice — eliminate hazard at root, even though
+   it required scrapping Task 3.1's production output):
+   - Extracted `decay_weighted_avg`, `rolling_decay_avg_series`,
+     `rolling_variance_series`, `rolling_trend_series` to v5/utils.py
+   - Refactored both rolling.py (player) and dst.py (DST) to use
+     `groupby(...).transform(...)` — position-safe by pandas design
+   - Math is byte-for-byte identical (verified: Mahomes 2024 W5
+     rolling_avg_passing_yards = 240.35 post-refactor vs 240.4 production)
+
+Key research finding
+--------------------
+`team_stats.def_fumbles` is NOT defensive fumble recoveries. It counts
+defenders who themselves fumbled (e.g., on INT returns). League sums confirm:
+def_fumbles = 76, fumble_recovery_opp = 283 (matches NFL ~280 defensive
+recoveries/season). The correct column is `fumble_recovery_opp`. A regression
+test (test_fumble_recoveries_uses_recovery_opp) guards against future
+reversion. Source: nflreadr player-stats data dictionary.
+
+DST scoring formula (industry standard)
+---------------------------------------
+fantasy_points_dst =
+    sacks * 1
+    + interceptions * 2
+    + fumble_recoveries * 2
+    + defensive_tds * 6
+    + safeties * 2
+    + blocked_kicks * 2
+    + return_tds * 6
+    + points_allowed_bonus(points_allowed)
+
+points_allowed_bonus tiers:
+    0 PA → +10
+    1-6 → +7
+    7-13 → +4
+    14-20 → +1
+    21-27 → 0
+    28-34 → -1
+    35+ → -4
+
+Note: blocked_kicks and return_tds are too rare/noisy to predict reliably.
+They enter only at fantasy-score derivation time using the team's rolling
+average as the expected value. Documented in dst.py docstring.
+
+Implementation
+--------------
+Created:
+- src/nfl/features/v5/dst.py — full DST pipeline (~430 lines):
+  - Foundation: points_allowed_bonus(), compute_dst_fantasy_points(),
+    build_master_dst_table() — 13-table self-join + opponent score lookup
+  - Pipeline: add_dst_rolling(), add_dst_opponent_offense() (pre-computed
+    opponent offense quality merged via opponent_team), add_dst_context()
+    (Vegas/weather), build_dst_features() orchestrator
+- src/nfl/features/v5/utils.py — shared rolling primitives. Single source
+  of truth for both player and DST pipelines.
+- tests/test_v5_dst.py — 17 tests (scoring, boundaries, regression guards
+  for fumble recoveries + missing columns, no-leakage with pinned values,
+  POST handling, real-data sanity, end-to-end engineer wiring)
+
+Modified:
+- src/nfl/features/v5/config.py — added STATS_TO_PREDICT['DST'],
+  FANTASY_DST_WEIGHTS, CORE_DST_STATS_FOR_ROLLING
+- src/nfl/features/v5/rolling.py — refactored to use transform helpers
+  from utils. ~30 lines shorter, position-safe.
+- src/nfl/features/v5/engineer.py — wired build_dst_features into
+  build_features. Docstring documents the side-effect contract (DST is
+  written to disk as a separate parquet, not included in return value).
+- src/nfl/features/v5/__init__.py — exported build_dst_features
+
+Architecture decisions
+----------------------
+1. Parallel team-week pipeline, not modification of existing player pipeline.
+   DST has no player_id and a different stat schema. Parallel files
+   (features_dst_{season}.parquet) keep schemas clean.
+
+2. Predict 6 stats, score with 8. blocked_kicks and return_tds are too
+   rare/noisy to predict directly (NFL averages: ~30 blocked kicks/season
+   league-wide, ~50 return TDs). Use rolling avg as expected value at
+   score time instead of a model.
+
+3. POST rows feed rolling history but are filtered before write. Mirrors
+   the cross-season warm-up convention from rolling.py: 2018-2019 are
+   warmup so Week 1 of 2020+ has full lookback. POST games (weeks 19-22)
+   contribute to the rolling history that flows into the next season's REG
+   weeks. Filter happens in build_dst_features just before writing.
+
+4. blocked_kicks via self-join. team T's defense blocked X kicks =
+   opponent's (fg_blocked + pat_blocked). Self-join team_stats on
+   (season, week, opponent_team) to derive.
+
+5. spread_line is flipped per team's POV in build_master_dst_table so
+   game_script_index = -spread_line works cleanly for both home and away
+   rows. Verified end-to-end: KC home favored W1 2024 → game_script_index
+   = -3.0, BAL away underdog → +3.0.
+
+6. DST weather thresholds intentionally stricter than player pipeline:
+   is_high_wind = wind >= 15 (player: > 15), is_cold = temp <= 32
+   (player: < 40). DST scoring is more sensitive to extreme weather
+   (snowstorms produce shutouts and turnover-heavy games).
+
+Validation
+----------
+Unit tests: 17 DST + 51 prior V5 = 68 v5 tests passing.
+Full repo: 312 tests passing, 1 skipped.
+
+End-to-end smoke (2023 + 2024 via build_features in tmp dir):
+- Total runtime: 35.7s (extrapolates to ~140s for 8 seasons locally)
+- Output: 4 parquets (player + DST per season)
+- Player: 13,342 rows × 238 cols
+- DST: 544 rows × 56 cols (REG only, all 32 teams)
+
+Value-equivalence verification (the critical refactor check):
+- Mahomes 2024 W5 rolling_avg_passing_yards = 240.35 post-refactor
+- Task 3.1 production reported 240.4 — matches to 2 decimals
+- Confirms transform refactor is byte-for-byte identical math
+- All 68 v5 tests pass with zero value drift
+
+Real-data DST spot-checks (2024):
+- 32 teams × 17 weeks ≈ 544 REG rows ✓
+- season_types = ['REG'] only (POST correctly filtered) ✓
+- KC W1 2024 points_allowed = 20 (BAL@KC was 27-20) ✓
+- KC game_script_index = -3.0 (favorite) ✓
+- BAL game_script_index = +3.0 (underdog) ✓
+
+Lessons learned
+---------------
+1. nflverse column names are not always self-documenting. `def_fumbles`
+   sounds like "defensive fumble recoveries" but it counts defenders'
+   own fumbles. Always cross-check league-wide sums against known NFL
+   totals when picking a column for fantasy scoring. The 76 vs 283 sum
+   discrepancy was the giveaway.
+
+2. Three review passes catch real bugs that single-pass review misses.
+   Pass 1 caught structural issues (duplication, weak tests, docs).
+   Pass 2 caught a defensive-coding bug (DataFrame.get + fillna chaining).
+   Pass 3 caught a latent silent-corruption hazard. Each pass took a
+   different angle. Total review investment: ~30 min for 3 passes,
+   versus the cost of a silent feature-corruption bug in production
+   (potentially weeks of model-debugging). Worth it every time.
+
+3. groupby + transform > groupby + list-append. The list-append + bulk-
+   assign pattern is correct only if input is sorted + reset_index'd,
+   and that contract is implicit. transform preserves the original
+   DataFrame index regardless of group iteration order, making the
+   contract structural. Both player and DST pipelines now use transform.
+   Cost: ~20 lines simpler per function. Benefit: zero risk of silent
+   feature corruption if a future caller passes a differently-ordered df.
+
+4. "Math identical" must be verified, not assumed. Refactored both
+   pipelines to transform, ran all 68 tests — they all passed, but that
+   only proved the synthetic test inputs produced identical outputs.
+   The real verification was the Mahomes 2024 W5 spot-check (240.35 vs
+   240.4 production) — a real-data smoke that confirmed equivalence on
+   the actual data shape we'd be regenerating.
+
+5. POST rows in rolling, filtered before write, is a non-obvious pattern.
+   Without comments, a future maintainer would think "why are POST rows
+   in the master table if we never train on them?" The answer is
+   cross-season warm-up: a postseason game from week 21 of 2024 should
+   contribute to the rolling avg at week 1 of 2025. Documented in
+   build_dst_features docstring + tested via test_post_rows_in_rolling
+   _but_not_output.
+
+6. "Best of both worlds" handoffs. The Colab notebook for HANDOFF #1.5
+   regenerates player + DST together in a single run. Local test ran 2
+   seasons in 35.7s, so 8 seasons should take ~3-5 min on Colab Pro
+   high-RAM CPU — far less than Task 3.1's original 30-60 min budget
+   (which was upper-bounded by network latency for parquet loads, not
+   compute).
+
+Remaining risks / Deferred
+--------------------------
+- DST features have no MAE validation yet — that requires Task 3.2
+  (model training). DST may need different model hyperparameters
+  (smaller dataset: 4,500 team-week rows vs 52,000 player-week rows).
+- 8-season production output not regenerated yet. HANDOFF #1.5 is
+  user-driven (Colab notebook ready).
+- add_dst_context missing-column branches (no spread_line, no roof, etc.)
+  are simple conditional fallbacks — never directly tested with synthetic
+  no-schedule data. Low risk; real data always has schedules.
+
+Handoff: User runs colab/v5_feature_engineering.ipynb on Colab Pro
+(high-RAM CPU). Output: 16 parquets (8 player + 8 DST) in
+/output/features/v5/ on Drive. Estimated runtime: 5-15 min total.

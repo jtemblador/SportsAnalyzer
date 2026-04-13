@@ -399,6 +399,7 @@ Notebooks are created per handoff (see each task below). Notebooks are **gitigno
 - [x] Colab notebook `colab/v5_feature_engineering.ipynb` with Drive mount + high-RAM check + spot-check cell
 - [x] **Delivered:** 90 feature columns on 2024 data in 16s, 295 tests passing
 - [x] **HANDOFF POINT #1 COMPLETE:** Colab run successful. 8 per-season Parquets generated (52,207 total rows, 14.4 MB) and downloaded to `data/nfl/features/v5/`. Production validation: 90 feature columns, Mahomes W5 rolling_avg_passing_yards=240.4, all data leakage tests passed.
+- ⚠️ **2026-04-13 — STALE:** Player feature parquets from this run were deleted after Task 3.1.5 review uncovered a latent silent-corruption hazard in the rolling computation (see Task 3.1.5 → "Code-quality refactor"). Math is unchanged but the implementation pattern was hardened. Re-run Handoff #1 jointly with Task 3.1.5 — see HANDOFF POINT #1.5 below.
 
 ### Task 3.1b — Feature validation (**Quick** — spot-check pass) ✅ COMPLETE
 - [x] No data leakage verified (W1 of first season has NaN opp_def_rank; Mahomes W1 rolling_avg ≠ current stat)
@@ -406,6 +407,60 @@ Notebooks are created per handoff (see each task below). Notebooks are **gitigno
 - [x] Spot-checked Mahomes (240.35 rolling passing yds, 24 games_of_history), Barkley, Kelce
 - [x] 90 feature columns total (rolling 43, context 20, usage 4, advanced 23) — exceeds 60-80 plan target
 - [x] **Deliverable:** Real-data integration tests in `tests/test_v5_real_data.py` (16 tests)
+
+### Task 3.1.5 — DST (Defense/Special Teams) feature engineering (**Medium** — parallel pipeline)
+
+**Goal:** Add the 6th fantasy position (DST) as a parallel team-week pipeline. Adds DEF/DST predictions to V5 alongside the existing 5 player positions. Uses standard ESPN/Yahoo/NFL.com scoring formula.
+
+**Stats to predict per team-week:**
+- `sacks` (from `team_stats.def_sacks`)
+- `interceptions` (from `team_stats.def_interceptions`)
+- `fumble_recoveries` (from `team_stats.fumble_recovery_opp`) ⚠ NOT `def_fumbles` — researched: that column counts defenders' own fumbles (e.g., on INT returns), not recoveries. League sums confirm: def_fumbles=76, fumble_recovery_opp=283 (matches NFL ~280 defensive recoveries/season). Regression test guards this.
+- `defensive_tds` (from `team_stats.def_tds`)
+- `safeties` (from `team_stats.def_safeties`)
+- `points_allowed` (computed: opponent's score from `schedules`)
+
+**DST scoring formula** (industry standard — ESPN/Yahoo/NFL.com/Sleeper):
+```
+fantasy_points_dst =
+    sacks * 1
+    + interceptions * 2
+    + fumble_recoveries * 2
+    + defensive_tds * 6
+    + safeties * 2
+    + blocked_kicks * 2
+    + return_tds * 6
+    + points_allowed_bonus(points_allowed)
+
+where points_allowed_bonus:
+    0 PA      → +10
+    1-6 PA    → +7
+    7-13 PA   → +4
+    14-20 PA  → +1
+    21-27 PA  → 0
+    28-34 PA  → -1
+    35+ PA    → -4
+```
+
+**Implementation plan:**
+- [x] Create `src/nfl/features/v5/dst.py` — `build_dst_features(data_dir, seasons)` produces team-week DataFrame
+- [x] Master DST table: one row per (team, season, week, season_type). REG + POST rows kept; POST feeds rolling history but is filtered before write.
+- [x] DST features (56 columns total on 2-season smoke):
+  - **Rolling defensive stats** — rolling_avg / variance / trend per stat in `CORE_DST_STATS_FOR_ROLLING` (8 stats × 3 = 24 cols)
+  - **`opp_rolling_avg_off_yards|tds|turnovers`** — opponent offense quality (3 cols)
+  - **Vegas/weather context** — `game_script_index`, `is_dome`, `is_high_wind`, `is_cold`, plus passthrough `spread_line`/`total_line`/`team_implied_total`/`opponent_implied_total`/`team_rest`/`opponent_rest`/`temp`/`wind`/`roof`/`div_game`
+  - **`blocked_kicks`** — derived via self-join: opponent's `(fg_blocked + pat_blocked)` for the same (season, week)
+- [x] Added `FANTASY_DST_WEIGHTS`, `STATS_TO_PREDICT['DST']`, `CORE_DST_STATS_FOR_ROLLING` to config.py; `points_allowed_bonus()` and `compute_dst_fantasy_points()` in dst.py
+- [x] Wired `build_dst_features` into `build_features` in engineer.py — when `output_dir` is set, both `features_{season}.parquet` and `features_dst_{season}.parquet` are written. (Docstring documents the side-effect contract; in-memory callers should call `build_dst_features` directly.)
+- [x] Tests in `tests/test_v5_dst.py` — 17 tests, including scoring formula, points_allowed_bonus boundaries, fumble_recoveries source regression guard, blocked_kicks self-join, no-leakage with pinned decay-weighted value, POST-rows-in-rolling-but-not-output, missing-column path with pinned arithmetic value, expected column count.
+- **Code-quality refactor (2026-04-13, after 3 review passes):**
+  - Extracted `decay_weighted_avg` and rolling helpers (`rolling_decay_avg_series`, `rolling_variance_series`, `rolling_trend_series`) to `src/nfl/features/v5/utils.py` — single source of truth for both player and DST pipelines.
+  - Refactored both `rolling.py` and `dst.py` to use `groupby(...).transform(...)` instead of the prior list-append + bulk-assign pattern. Math is byte-for-byte identical (all 68 v5 tests pass without value drift); transform makes the position-safety contract structural rather than implicit, eliminating a latent silent-corruption hazard if the input DataFrame ordering ever changed.
+  - Fixed `add_dst_opponent_offense` brittleness — `DataFrame.get(col, 0).fillna(0)` would have crashed if any optional column ever went missing in a future nflverse release. Replaced with a defensive `_col` helper returning a zero-filled Series. Regression test now pins arithmetic values.
+  - Strengthened rolling leakage test with explicit decay-weighted-average value pin (catches off-by-one in window slicing).
+- [ ] **Deliverable:** 8 per-season DST feature Parquets (~576 rows × 8 seasons ≈ 4,500 rows total) + 8 re-generated player feature Parquets ready for training.
+- **Local re-run is fast (~3 min for both pipelines, 8 seasons).** Colab handoff is optional but recommended to keep the production-output path consistent with Task 3.1.
+- **>>> HANDOFF POINT #1.5:** Re-run `colab/v5_feature_engineering.ipynb` (or local equivalent) — `build_features` now produces both `features_{season}.parquet` AND `features_dst_{season}.parquet` per season. Stale player parquets from Handoff #1 were deleted (rolling math is identical post-refactor, but re-running keeps the production pipeline in sync with the code). Estimated 30-60 min on Colab Pro for all 8 seasons. Output: 16 Parquets total (8 player + 8 DST) in `data/nfl/features/v5/`.
 
 ### Task 3.2 — V5 model training (**Heavy** — compute-intensive, ~20-30 min per full run)
 - [ ] Create `src/nfl/training/v5_train.py`
@@ -415,7 +470,8 @@ Notebooks are created per handoff (see each task below). Notebooks are **gitigno
   - WR: receptions, receiving_yards, receiving_tds, targets (4 × 2 = 8)
   - TE: receptions, receiving_yards, receiving_tds, targets (4 × 2 = 8)
   - K: fg_made, fg_att, pat_made (3 × 2 = 6)
-  - **Total: ~42 models** (similar to V4's 40)
+  - **DST: sacks, interceptions, fumble_recoveries, defensive_tds, safeties, points_allowed (6 × 2 = 12)**
+  - **Total: ~54 models** (was 42, +12 for DST)
 - [ ] Position-specific hyperparameters (from V4): QB depth=9, RB/WR depth=7, TE depth=6, K depth=3
 - [ ] Expanding-window walk-forward validation: train on prior data, predict each week for 2021-2024
 - [ ] Compute per-stat and per-position MAE, compare against V4

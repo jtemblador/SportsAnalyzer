@@ -25,7 +25,29 @@ STATS_TO_PREDICT = {
     'WR': ['receptions', 'receiving_yards', 'receiving_tds', 'targets'],
     'TE': ['receptions', 'receiving_yards', 'receiving_tds', 'targets'],
     'K':  ['fg_made', 'fg_att', 'pat_made'],
+    'DST': ['sacks', 'interceptions', 'fumble_recoveries', 'defensive_tds',
+            'safeties', 'points_allowed'],
 }
+
+# Fantasy DST scoring weights — standard ESPN/Yahoo values.
+# NOTE: points_allowed is scored via tiered bonus (see dst.points_allowed_bonus),
+# not a linear weight. blocked_kicks and return_tds are scoring-only stats
+# (included in scoring but not in STATS_TO_PREDICT['DST']).
+FANTASY_DST_WEIGHTS = {
+    'sacks': 1.0,
+    'interceptions': 2.0,
+    'fumble_recoveries': 2.0,
+    'defensive_tds': 6.0,
+    'safeties': 2.0,
+    'blocked_kicks': 2.0,
+    'return_tds': 6.0,
+}
+
+# Core DST stats used for rolling average features (parallel to CORE_STATS_FOR_ROLLING).
+CORE_DST_STATS_FOR_ROLLING = [
+    'sacks', 'interceptions', 'fumble_recoveries', 'defensive_tds',
+    'safeties', 'points_allowed', 'return_tds', 'blocked_kicks',
+]
 
 # Feature groups for ablation study (Task 3.2b will remove one at a time)
 FEATURE_GROUPS = {

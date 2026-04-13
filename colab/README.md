@@ -11,7 +11,7 @@ Feature engineering (~4-5 hours) and model training (~1-4 hours) are too slow on
 | Notebook | Purpose | Status |
 |----------|---------|--------|
 | `colab_test.ipynb` | Verify Colab connection, Drive mount, data access, ML libraries | Ready |
-| `v5_feature_engineering.ipynb` | Run V5 feature engineering on all seasons | Pending Task 3.1 |
+| `v5_feature_engineering.ipynb` | Run V5 player + DST feature engineering on all seasons | Ready (HANDOFF #1.5) |
 | `v5_training.ipynb` | Train V5 models with walk-forward validation | Pending Task 3.2 |
 | `v5_ablation.ipynb` | Feature ablation study | Pending Task 3.2b |
 | `v5_final_retrain.ipynb` | Final V5 training with validated features + predictions | Pending Task 3.2c |
@@ -28,12 +28,22 @@ Each notebook follows the same pattern:
 
 ```
 My Drive/SportsAnalyzer/
-├── data/nfl/         ← 13 dataset folders (uploaded once)
-├── scripts/          ← Python scripts imported by notebooks
+├── data/nfl/                 ← 13 dataset folders (uploaded once from local data/nfl/)
+├── src/nfl/features/v5/      ← V5 package (re-upload after code changes)
+│   ├── __init__.py
+│   ├── config.py
+│   ├── master_table.py
+│   ├── rolling.py
+│   ├── context.py
+│   ├── usage.py
+│   ├── advanced.py
+│   ├── dst.py        ← Task 3.1.5
+│   ├── utils.py      ← shared rolling helpers (Task 3.1.5 refactor)
+│   └── engineer.py
 └── output/
-    ├── features/     ← Notebook outputs — feature Parquet files
-    ├── models/       ← Trained .joblib files
-    └── predictions/  ← V5 predictions
+    ├── features/v5/  ← notebook writes 16 parquets (8 player + 8 DST)
+    ├── models/       ← Trained .joblib files (Task 3.2)
+    └── predictions/  ← V5 predictions (Task 3.2c)
 ```
 
 ## Opening in VS Code

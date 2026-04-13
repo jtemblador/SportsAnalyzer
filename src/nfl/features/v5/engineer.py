@@ -11,8 +11,11 @@ Pipeline:
 4. Add usage features (snap counts, injury, depth)
 5. Add advanced features (NGS, PFR, FF opportunity rolling)
 6. Optionally save per-season Parquet files
+7. Build and (optionally) save parallel DST team-week feature tables
+   as features_dst_{season}.parquet (Task 3.1.5).
 
-Output rows: one per player per week. Features are all pre-game only.
+Output rows: one per player per week (plus parallel DST team-week tables
+when output_dir is provided). Features are all pre-game only.
 """
 
 import pandas as pd
@@ -26,6 +29,7 @@ from src.nfl.features.v5.context import (
 )
 from src.nfl.features.v5.usage import add_usage_features
 from src.nfl.features.v5.advanced import add_advanced_features
+from src.nfl.features.v5.dst import build_dst_features
 
 
 def build_features(data_dir, seasons, output_dir=None, verbose=True):
@@ -54,6 +58,11 @@ def build_features(data_dir, seasons, output_dir=None, verbose=True):
 
     Returns:
         DataFrame of features for all (player_id, season, week) combinations.
+        NOTE: this is the player-week table only. The parallel DST team-week
+        table is produced as a side effect when output_dir is set (written to
+        {output_dir}/v5/features_dst_{season}.parquet) and is NOT included in
+        the return value. Callers needing DST in-memory should call
+        `build_dst_features(data_dir, seasons)` directly.
     """
     if verbose:
         print(f"V5 feature engineering: seasons {min(seasons)}-{max(seasons)}")
@@ -99,5 +108,15 @@ def build_features(data_dir, seasons, output_dir=None, verbose=True):
             season_df.to_parquet(path)
             if verbose:
                 print(f"  Saved {path} ({len(season_df):,} rows)")
+
+        # Parallel DST team-week feature tables (Task 3.1.5).
+        if verbose:
+            print("Building parallel DST team-week features...")
+        build_dst_features(
+            data_dir=data_dir,
+            seasons=seasons,
+            output_dir=output_dir,
+            verbose=verbose,
+        )
 
     return df
