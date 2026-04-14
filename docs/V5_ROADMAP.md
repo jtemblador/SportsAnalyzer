@@ -506,8 +506,14 @@ where points_allowed_bonus:
 - [x] Tests in `tests/test_v5_training.py` (27 synthetic + 3 real-data, 30 total): hyperparams sanity, apply_history_filter, compute_pob_target, walk-forward strict-prior invariant (monkey-patched prepare verifies actual invariant), ensemble predict returns mean, TE/receptions real-data smoke + DST Poisson non-negative + WR POB balance. Plus load-bearing regressions: whitelist blocks known leakage columns, fill_features temp=65 consistency across train+predict, meta JSON records neutral_fills, degenerate_pob flag.
 - [x] Created `colab/v5_training.ipynb` (8 cells): mount Drive, verify paths + DST parquet preflight, high-RAM check, install ML libs, resume check, feature shape inspection, training loop with monkey-patched path helpers, ensemble count verification, MAE summary with degenerate_pob warning.
 - [x] **Deliverable planned:** 174 .joblib files (not 216 — per-position algo subsets) + 54 metadata JSON in `output/models/v5/`, `_mae_summary.csv` with columns: version, position, stat, model_type, algorithms, n_train_rows, n_features, n_eval_predictions, status, trained_at, mae_v5 (or accuracy/auc/pos_class_frac/degenerate_pob for POB).
-- [x] **Estimated runtime:** 1-3 hours on Colab Pro high-RAM CPU. Local baseline: DST/sacks/stat = 125s end-to-end. Naive 54x extrapolation = 112 min; realistic accounting for player-position row counts = 1-3 hours.
-- **>>> HANDOFF POINT #2:** User runs `colab/v5_training.ipynb` on Colab Pro. Claude resumes to analyze MAE results before triggering Task 3.2b. **READY** — see `docs/progress/2026-04-13_task_3.2_v5_training.txt` HANDOFF section.
+- [x] **Estimated runtime:** 1-3 hours on Colab Pro high-RAM CPU. Local baseline: DST/sacks/stat = 125s end-to-end. Naive 54x extrapolation = 112 min; realistic accounting for player-position row counts = 1-3 hours. (Actual: 5h 10min for 54 ensembles with full walk-forward.)
+- [x] **DB tracking (DONE 2026-04-14).**
+  Added `model_eval_metrics` table (granular per-(position, stat, type) metrics) + wrote V5 aggregate row to existing `model_versions` table. Enables cross-version MAE queries (V1→V5) in the Postgres accuracy dashboard (Task 3.3).
+  - [x] Added `model_eval_metrics` table to `src/nfl/db/schema.sql`
+  - [x] Wrote `src/nfl/db/load_model_eval.py` — loaded 54 V5 rows
+  - [x] Inserted V5 aggregate row into `model_versions` (mae=4.237 realistic PPR estimate, positions include DST)
+  - [x] Added 5 tests to `tests/test_database.py::TestModelEvalMetrics` — all green (19/19 DB tests pass)
+- **>>> HANDOFF POINT #2:** User runs `colab/v5_training.ipynb` on Colab Pro. Claude resumes to analyze MAE results before triggering Task 3.2b. **DONE 2026-04-14** — 54/54 ensembles complete, 5h 10min runtime. Results in `data/nfl/models/v5/_mae_summary_consolidated.csv`. See `docs/progress/2026-04-13_task_3.2_v5_training.txt` HANDOFF section.
 
 **Code-quality enhancements beyond original plan (from 4 review rounds, 23 fixes):**
 - [x] Whitelist-based feature selection (prefix-match only, prevents current-week leakage via ngs_*, pfr_*, target_share, *_exp that the V5 parquet contains alongside rolling equivalents).
@@ -562,6 +568,7 @@ where points_allowed_bonus:
   - Estimated runtime per ablation run: ~10-30 min for player position; ~1 min for DST. Total: 4-12 hours on Colab Pro. Pro+ recommended for background execution.
   - Step: aggregate results into `_ablation_summary.csv` (columns: position, group_removed, mae_with_group, mae_without_group, delta, drop_decision)
 - [ ] **Deliverable:** `_ablation_summary.csv` + decision document `docs/progress/{date}_ablation_results.md` listing groups kept/dropped per position with rationale + final feature list for Task 3.2c.
+- [ ] **DB tracking:** Each ablation run writes rows to `model_eval_metrics` with `version='v5_ablated_<group>'` (e.g., `v5_ablated_rolling`, `v5_ablated_context`). Enables querying "which ablation run hurt MAE most for WR?" directly from Postgres. Reuses `src/nfl/db/load_model_eval.py` helper from Task 3.2.
 - **>>> HANDOFF POINT #3:** User runs `colab/v5_ablation.ipynb`. Estimated 4-12 hours on Colab Pro (consider Pro+ for background). Claude resumes to analyze deltas and write the decision document.
 
 **Risks / pre-flight checks:**
@@ -585,7 +592,7 @@ where points_allowed_bonus:
 
 4. **Backfill `actual_value` for 2025 predictions.** Reuse `load_predictions.py` pattern: after inserting predictions, UPDATE `actual_value` from `weekly_stats` (player) or compute from `team_stats` (DST). Compute `error = predicted_value - actual_value` for accuracy queries.
 
-5. **Model versioning in DB.** Insert into `model_versions` table: `version='v5'`, `description='V5 with ablation-validated features + DST'`, `n_features=<count>`, `n_models=54`, `train_seasons='2020-2025'`. Required by FK from predictions table.
+5. **Model versioning in DB.** Insert into `model_versions` table: `version='v5'`, `description='V5 with ablation-validated features + DST'`, `n_features=<count>`, `n_models=54`, `train_seasons='2020-2025'`. Required by FK from predictions table. (Note: initial V5 row was created during Task 3.2 DB tracking with pre-ablation MAE; this step UPDATEs it with the final post-ablation mae.)
 
 6. **MAE verification step.** Before declaring task done, run `SELECT version, position, AVG(ABS(error)) FROM predictions WHERE actual_value IS NOT NULL AND season=2025 GROUP BY version, position` and assert V5 numbers are within target bands. Fail loudly if a position regressed badly vs V4 (>0.5 MAE worse) — likely a bug, not a model failure.
 

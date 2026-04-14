@@ -66,8 +66,9 @@ class TestTablesExist:
         """)
         tables = [row[0] for row in cur.fetchall()]
         cur.close()
-        # 14 data tables + 2 prediction tables (predictions, model_versions)
-        assert len(tables) == 16, f"Expected 16 tables, found {len(tables)}: {tables}"
+        # 14 data tables + 3 prediction/eval tables (predictions, model_versions,
+        # model_eval_metrics added in Task 3.2)
+        assert len(tables) == 17, f"Expected 17 tables, found {len(tables)}: {tables}"
 
     def test_each_table_exists(self, conn):
         cur = conn.cursor()
@@ -208,3 +209,76 @@ class TestQueryData:
         assert row is not None
         assert row[1] is not None  # pfr_id exists
         assert 'Mahomes' in row[2]
+
+
+class TestModelEvalMetrics:
+    """Verify the model_eval_metrics table added in Task 3.2."""
+
+    def test_table_exists_with_expected_columns(self, conn):
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'model_eval_metrics'
+            ORDER BY ordinal_position
+        """)
+        cols = [row[0] for row in cur.fetchall()]
+        cur.close()
+        required = {"version", "position", "stat", "model_type", "mae",
+                    "accuracy", "auc", "pos_class_frac", "degenerate_pob",
+                    "n_eval_predictions", "n_train_rows", "algorithms",
+                    "n_features", "trained_at"}
+        assert required.issubset(set(cols)), \
+            f"Missing columns in model_eval_metrics: {required - set(cols)}"
+
+    def test_v5_has_54_rows(self, conn):
+        """After load_model_eval.py runs, V5 should have exactly 54 rows
+        (27 stat + 27 pob)."""
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM model_eval_metrics WHERE version = 'v5'")
+        count = cur.fetchone()[0]
+        cur.close()
+        if count == 0:
+            pytest.skip("V5 not loaded yet — run `python src/nfl/db/load_model_eval.py`")
+        assert count == 54, f"Expected 54 V5 eval rows, found {count}"
+
+    def test_v5_stat_pob_balance(self, conn):
+        """V5 should have 27 stat + 27 pob rows."""
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT model_type, COUNT(*) FROM model_eval_metrics
+            WHERE version = 'v5' GROUP BY model_type
+        """)
+        counts = dict(cur.fetchall())
+        cur.close()
+        if not counts:
+            pytest.skip("V5 not loaded yet — run `python src/nfl/db/load_model_eval.py`")
+        assert counts.get("stat") == 27, f"Expected 27 stat rows, got {counts.get('stat')}"
+        assert counts.get("pob") == 27, f"Expected 27 pob rows, got {counts.get('pob')}"
+
+    def test_v5_aggregate_in_model_versions(self, conn):
+        """V5 aggregate row must exist in model_versions (FK prerequisite)."""
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT mae, positions FROM model_versions WHERE version = 'v5'
+        """)
+        row = cur.fetchone()
+        cur.close()
+        if row is None:
+            pytest.skip("V5 not loaded yet — run `python src/nfl/db/load_model_eval.py`")
+        assert row[0] is not None, "V5 aggregate MAE should not be NULL"
+        assert "DST" in row[1], "V5 positions should include DST"
+
+    def test_known_good_row_rb_rushing_yards(self, conn):
+        """Spot-check a known V5 result: RB rushing_yards stat MAE ~19.99."""
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT mae, n_eval_predictions FROM model_eval_metrics
+            WHERE version = 'v5' AND position = 'RB'
+              AND stat = 'rushing_yards' AND model_type = 'stat'
+        """)
+        row = cur.fetchone()
+        cur.close()
+        if row is None:
+            pytest.skip("V5 not loaded yet")
+        assert 19.0 < row[0] < 21.0, f"RB rushing_yards MAE {row[0]} outside expected ~19.99"
+        assert row[1] == 6015, f"Expected 6015 eval predictions, got {row[1]}"

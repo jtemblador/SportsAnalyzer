@@ -428,6 +428,69 @@ class TestEnsembles:
         assert "neutral_fills" in meta
         assert meta["neutral_fills"]["temp"] == 65.0
 
+    def test_atomic_append_csv_unions_stat_and_pob_rows(self, tmp_path):
+        """Regression: stat rows + pob rows must coexist in _mae_summary.csv.
+        Previously, _atomic_append_csv rotated the file on every stat→pob
+        transition because POB rows introduce accuracy/auc/pos_class_frac
+        cols that stat rows lack (and vice versa). Fix: both shapes are in
+        _KNOWN_SUMMARY_COLUMNS, so pandas unions them with NaN fills."""
+        from src.nfl.training.v5.train import _atomic_append_csv
+        csv_path = tmp_path / "_mae_summary.csv"
+
+        stat_row = {
+            "version": "v5", "position": "QB", "stat": "passing_yards",
+            "model_type": "stat", "algorithms": "xgboost,lightgbm,catboost",
+            "mae_v5": 63.02, "n_eval_predictions": 2568, "n_train_rows": 3181,
+            "status": "ok", "n_features": 88,
+        }
+        pob_row = {
+            "version": "v5", "position": "QB", "stat": "passing_yards",
+            "model_type": "pob", "algorithms": "xgboost,lightgbm,catboost",
+            "accuracy": 0.602, "auc": 0.650, "pos_class_frac": 0.486,
+            "degenerate_pob": 0, "n_eval_predictions": 2568,
+            "n_train_rows": 3181, "status": "ok", "n_features": 88,
+        }
+        _atomic_append_csv(stat_row, csv_path)
+        _atomic_append_csv(pob_row, csv_path)
+        _atomic_append_csv(stat_row, csv_path)
+
+        # Must not have rotated — no *_pre_schema_*.csv created
+        rotated = list(tmp_path.glob("*_pre_schema_*.csv"))
+        assert not rotated, f"Unexpected rotation: {rotated}"
+
+        # Union schema — 3 rows, both column shapes present
+        df = pd.read_csv(csv_path)
+        assert len(df) == 3
+        assert "mae_v5" in df.columns
+        assert "auc" in df.columns
+        assert (df["model_type"] == "stat").sum() == 2
+        assert (df["model_type"] == "pob").sum() == 1
+
+    def test_atomic_append_csv_rotates_on_truly_unexpected_column(self, tmp_path):
+        """Rotation still fires when a genuinely new column appears (e.g.,
+        future schema change that this code is not aware of)."""
+        from src.nfl.training.v5.train import _atomic_append_csv
+        csv_path = tmp_path / "_mae_summary.csv"
+
+        # Seed with a normal stat row
+        _atomic_append_csv(
+            {"version": "v5", "position": "QB", "stat": "passing_yards",
+             "model_type": "stat", "mae_v5": 63.02}, csv_path,
+        )
+        # Inject row with an unexpected column
+        import warnings
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            _atomic_append_csv(
+                {"version": "v5", "position": "QB", "stat": "passing_yards",
+                 "model_type": "stat", "mae_v5": 63.02,
+                 "brand_new_column_v51": "surprise"},
+                csv_path,
+            )
+        assert any("schema drift" in str(w.message) for w in caught)
+        rotated = list(tmp_path.glob("*_pre_schema_*.csv"))
+        assert len(rotated) == 1
+
     def test_meta_records_objective_per_algo(self, tmp_path):
         import json
         df = _synth_player_df(weeks_per_season=6, players=15)

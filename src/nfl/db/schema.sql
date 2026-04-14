@@ -775,3 +775,28 @@ CREATE TABLE IF NOT EXISTS predictions (
 CREATE INDEX IF NOT EXISTS idx_predictions_version ON predictions (version, season, week);
 CREATE INDEX IF NOT EXISTS idx_predictions_player ON predictions (player_id, season, week, stat);
 CREATE INDEX IF NOT EXISTS idx_predictions_accuracy ON predictions (version, stat, model_type) WHERE actual_value IS NOT NULL;
+
+-- Per-ensemble evaluation metrics (granular, introduced with V5 — 54 rows per version)
+-- One row per (version, position, stat, model_type). Populated by load_model_eval.py
+-- from the {_mae_summary_consolidated.csv} output of each training run.
+-- Ablation runs write rows with version='v5_ablated_<group>' etc.
+CREATE TABLE IF NOT EXISTS model_eval_metrics (
+    version TEXT NOT NULL REFERENCES model_versions(version),
+    position TEXT NOT NULL,         -- QB/RB/WR/TE/K/DST
+    stat TEXT NOT NULL,             -- passing_yards, sacks, etc.
+    model_type TEXT NOT NULL,       -- 'stat' (StatPredictor) or 'pob' (POBModel)
+    mae FLOAT,                       -- populated for stat rows; NULL for pob
+    accuracy FLOAT,                  -- populated for pob rows
+    auc FLOAT,                       -- populated for pob rows
+    pos_class_frac FLOAT,            -- populated for pob rows
+    degenerate_pob SMALLINT DEFAULT 0,  -- 1 if pos_class_frac <0.05 or >0.95
+    n_eval_predictions INTEGER,
+    n_train_rows INTEGER,
+    algorithms TEXT,                 -- comma-separated list
+    n_features INTEGER,
+    trained_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (version, position, stat, model_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_model_eval_version ON model_eval_metrics (version);
+CREATE INDEX IF NOT EXISTS idx_model_eval_position_stat ON model_eval_metrics (position, stat);

@@ -56,36 +56,49 @@ def _summary_path() -> Path:
     return _models_dir() / "_mae_summary.csv"
 
 
+# Canonical known columns across all stat/pob rows. New keys outside this set
+# signal a real schema change (e.g., an intentional column rename in a future
+# V5.1) and trigger rotation. stat↔pob transitions do NOT trigger rotation
+# because both are legitimate row shapes — pandas unions their columns with NaN.
+_KNOWN_SUMMARY_COLUMNS: set[str] = {
+    # shared
+    "version", "position", "stat", "model_type", "algorithms",
+    "n_train_rows", "n_features", "n_eval_predictions", "status", "trained_at",
+    # stat-only
+    "mae_v5",
+    # pob-only
+    "accuracy", "auc", "pos_class_frac", "degenerate_pob",
+}
+
+
 def _atomic_append_csv(row: dict, path: Path) -> None:
     """Append one row to CSV. Read-modify-write with atomic replace.
 
-    Detects schema drift (e.g., from a pre-rename run with `mae` instead of
-    `mae_v5`): rotates the old CSV with a timestamp suffix and starts fresh,
-    so downstream consumers don't read a NaN-polluted union of two schemas.
+    Schema handling:
+    - stat rows have `mae_v5` but no accuracy/auc; pob rows have the opposite.
+      Both shapes are valid — pandas concat unions columns with NaN fills,
+      which is what Task 3.2b ablation expects (filters by model_type).
+    - Rotation ONLY triggers if an incoming row introduces a column name NOT
+      in _KNOWN_SUMMARY_COLUMNS (e.g., a future schema evolution). This
+      prevents the spurious rotation-on-every-transition bug from Round 3.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
+    unexpected_cols = set(row.keys()) - _KNOWN_SUMMARY_COLUMNS
+    if path.exists() and unexpected_cols:
+        from datetime import datetime as _dt
+        stamp = _dt.now().strftime("%Y%m%dT%H%M%S")
+        rotated = path.with_name(f"{path.stem}_pre_schema_{stamp}.csv")
+        os.replace(path, rotated)
+        import warnings
+        warnings.warn(
+            f"_mae_summary.csv schema drift — rotated old file to {rotated.name} "
+            f"(unexpected cols: {sorted(unexpected_cols)}). Starting fresh.",
+            stacklevel=2,
+        )
+        df = pd.DataFrame([row])
+    elif path.exists():
         existing = pd.read_csv(path)
-        existing_cols = set(existing.columns)
-        new_cols = set(row.keys())
-        # Schema mismatch = current row's required columns missing in existing.
-        # We only rotate if the discrepancy involves columns the new row produces
-        # (a stale schema would lack one of new_cols).
-        missing_in_existing = new_cols - existing_cols
-        if missing_in_existing:
-            from datetime import datetime as _dt
-            stamp = _dt.now().strftime("%Y%m%dT%H%M%S")
-            rotated = path.with_name(f"{path.stem}_pre_schema_{stamp}.csv")
-            os.replace(path, rotated)
-            import warnings
-            warnings.warn(
-                f"_mae_summary.csv schema drift — rotated old file to {rotated.name} "
-                f"(missing cols: {sorted(missing_in_existing)}). Starting fresh.",
-                stacklevel=2,
-            )
-            df = pd.DataFrame([row])
-        else:
-            df = pd.concat([existing, pd.DataFrame([row])], ignore_index=True)
+        df = pd.concat([existing, pd.DataFrame([row])], ignore_index=True)
     else:
         df = pd.DataFrame([row])
     tmp = path.with_suffix(path.suffix + ".tmp")
