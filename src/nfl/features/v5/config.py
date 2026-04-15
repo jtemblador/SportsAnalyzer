@@ -109,6 +109,13 @@ FEATURE_GROUP_PREFIXES = {
                      'rolling_rush_fantasy_points_'],
         'exact': [],
     },
+    # DST-only group: opponent offensive rolling stats. Narrow prefix so this
+    # doesn't overlap with `context` group's `opp_def_rank_*` columns (which
+    # also start with 'opp_'). Only captures the 3 DST-specific columns.
+    'opp_offense': {
+        'prefixes': ['opp_rolling_avg_off_'],
+        'exact': [],
+    },
 }
 
 
